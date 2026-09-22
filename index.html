@@ -1,0 +1,3253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Yas's ASCII Lab</title>
+<meta name="description" content="Interactive 3D ASCII &amp; dither lab — upload a 3D model, image, or video and render it as live ASCII art or dithered color output." />
+<style>
+:root {
+  color-scheme: light dark;
+  --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', ui-monospace, monospace;
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --muted: #f5f5f5;
+  --muted-foreground: #6b6b6b;
+  --accent: #f0f0f0;
+  --border: #e5e5e5;
+  --input-background: #ffffff;
+  --radius: 6px;
+  --canvas-bg: #eeeeee;
+  --primary: #000000;
+  --primary-hover: #1a1a1a;
+  --primary-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0a0a0a;
+    --foreground: #f5f5f5;
+    --card: #0a0a0a;
+    --muted: #1a1a1a;
+    --muted-foreground: #a3a3a3;
+    --accent: #262626;
+    --border: #262626;
+    --input-background: #0a0a0a;
+    --canvas-bg: #262626;
+    --primary: #ffffff;
+    --primary-hover: #e5e5e5;
+    --primary-foreground: #0a0a0a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  --card: #0a0a0a;
+  --muted: #1a1a1a;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --border: #262626;
+  --input-background: #0a0a0a;
+  --canvas-bg: #262626;
+  --primary: #ffffff;
+  --primary-hover: #e5e5e5;
+  --primary-foreground: #0a0a0a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html { font-size: 14px; }
+
+body {
+  font-family: var(--font-mono);
+  background: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "liga" 0, "kern" 1, "calt" 0;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+button, input, select {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Original design forces sharp (zero) corners on every interactive
+   control; only card/panel containers keep the 6px radius. */
+button, input, select, textarea,
+.minimal-button, .minimal-button-primary, .minimal-input,
+.preset-panel, .modal-card {
+  border-radius: 0;
+}
+
+::selection { background: var(--foreground); color: var(--background); }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  background: var(--background);
+}
+
+/* ---------- Top bar ---------- */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  flex-shrink: 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mono-title {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.mono-subtitle {
+  font-family: var(--font-mono);
+  font-weight: 650;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.mono-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+
+.clean-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.clean-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Buttons ---------- */
+.minimal-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 7px 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.minimal-button:hover { background: var(--accent); border-color: var(--foreground); }
+.minimal-button:active { background: var(--muted); }
+.minimal-button.is-active { background: var(--accent); border-color: var(--foreground); }
+.minimal-button:focus-visible { outline: none; border-color: var(--foreground); box-shadow: 0 0 0 1px var(--foreground); }
+
+.minimal-button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 7px 14px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+.minimal-button-primary:hover { background: var(--foreground); border-color: var(--foreground); }
+.minimal-button-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.minimal-button-primary:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--foreground); }
+
+.icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+.minimal-button.icon-only { padding: 7px 9px; }
+
+/* ---------- Layout ---------- */
+.main-area {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  height: 100%;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--background);
+}
+
+.sidebar-inner {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.canvas-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+  padding: 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.canvas-card {
+  background: var(--canvas-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.canvas-card canvas { display: block; }
+
+/* ---------- Accordion ---------- */
+.minimal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+details.accordion-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+details.accordion-item + details.accordion-item { margin-top: 10px; }
+
+.accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.accordion-trigger::-webkit-details-marker { display: none; }
+.accordion-trigger:hover { background: var(--accent); }
+.accordion-trigger:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--foreground); }
+
+.accordion-trigger .chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-foreground);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+details[open] > .accordion-trigger .chevron { transform: rotate(180deg); }
+
+.accordion-content {
+  padding: 0 14px 14px;
+}
+
+/* ---------- Form elements ---------- */
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.minimal-input {
+  width: 100%;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--input-background);
+  border: 1px solid var(--border);
+  transition: all 0.15s ease;
+}
+.minimal-input:focus, .minimal-input:focus-visible {
+  outline: none;
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--foreground);
+}
+
+select.minimal-input { appearance: none; -webkit-appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b6b' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.divider-top { border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* Sliders — chunky 16px pill track matching the source's default Radix
+   sizing (h-4 track, size-4 thumb), with a JS-driven gradient fill. */
+.slider-row input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--muted);
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--background);
+  border: 1px solid var(--primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--background);
+  border: 1px solid var(--primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-webkit-slider-runnable-track { height: 16px; border-radius: 999px; background: transparent; }
+.slider-row input[type="range"]::-moz-range-track { height: 16px; border-radius: 999px; background: transparent; }
+.slider-row input[type="range"]:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0,0,0,0.15); border-radius: 999px; }
+
+/* Toggle switch */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  border-radius: var(--radius);
+}
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch .track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+.switch .thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 16px;
+  height: 16px;
+  background: var(--card);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  transition: transform 0.15s ease;
+}
+.switch input:checked + .track { background: var(--primary); }
+.switch input:checked + .track .thumb { transform: translateX(14px); }
+.switch input:focus-visible + .track { outline: none; box-shadow: 0 0 0 3px rgba(0,0,0,0.15); }
+
+/* Checkbox */
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Color rows */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  padding: 7px 10px;
+  border-radius: var(--radius);
+}
+.color-row input[type="color"] {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: none;
+}
+.color-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--foreground);
+}
+.color-row input[type="text"]:focus { outline: none; }
+
+.palette-swatch-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.palette-swatch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+/* File dropzone */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 22px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.dropzone:hover { background: var(--accent); border-color: var(--foreground); }
+.dropzone.drag-over { background: var(--accent); border-color: var(--foreground); }
+.dropzone svg { margin: 0 auto 8px; display: block; opacity: 0.5; }
+.dropzone p { margin: 0; font-size: 13px; color: var(--muted-foreground); font-family: var(--font-mono); }
+.status-message { margin-top: 8px; font-size: 12px; color: var(--muted-foreground); text-align: center; }
+
+/* Preset dropdown (custom, supports hover-preview) */
+.preset-dropdown { position: relative; }
+.preset-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+.preset-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 4px;
+  display: none;
+}
+.preset-panel.open { display: block; }
+.preset-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 8px 10px 4px;
+  color: var(--muted-foreground);
+}
+.preset-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.preset-option:hover, .preset-option.highlighted { background: var(--accent); }
+
+/* Export modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal-card {
+  background: var(--background);
+  border: 1px solid var(--border);
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.modal-desc {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin-bottom: 16px;
+}
+.modal-body { display: flex; flex-direction: column; gap: 14px; }
+.export-size-box {
+  padding: 8px 10px;
+  background: var(--muted);
+  font-size: 13px;
+}
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+  width: 0%;
+}
+.modal-actions { display: flex; gap: 8px; padding-top: 4px; }
+.modal-actions .minimal-button,
+.modal-actions .minimal-button-primary { flex: 1; justify-content: center; }
+
+/* Custom cursor — real pixel-art arrow/fist artwork from the source file */
+#custom-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 9999;
+  display: none;
+}
+#custom-cursor svg { display: block; width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+
+/* Scrollbars */
+.sidebar::-webkit-scrollbar, .preset-panel::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb, .preset-panel::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* Responsive: stack sidebar above canvas on narrow viewports */
+@media (max-width: 860px) {
+  .main-area { flex-direction: column; }
+  .sidebar { width: 100%; height: 46vh; border-right: none; border-bottom: 1px solid var(--border); }
+  .canvas-main { flex: 1; min-height: 0; }
+  .top-bar { gap: 8px; }
+  .mono-title { font-size: 14px; }
+  .minimal-button, .minimal-button-primary { padding: 6px 9px; font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <div class="top-bar">
+    <div class="mono-title">Yas's ASCII Lab</div>
+    <div class="clean-cluster">
+      <button id="btn-custom-cursor" class="minimal-button is-active" type="button">Custom Cursor</button>
+      <button id="btn-zoom-out" class="minimal-button icon-only" type="button" title="Zoom out" aria-label="Zoom out">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button id="btn-zoom-in" class="minimal-button icon-only" type="button" title="Zoom in" aria-label="Zoom in">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </button>
+      <button id="btn-reset-camera" class="minimal-button" type="button">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        Reset camera
+      </button>
+      <button id="btn-toggle-rotation" class="minimal-button" type="button">
+        <svg id="icon-pause" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <svg id="icon-play" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span id="rotation-label">Stop rotation</span>
+      </button>
+      <button id="btn-export" class="minimal-button-primary" type="button">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <!-- ===================== Sidebar / Control Panel ===================== -->
+    <div class="sidebar">
+      <div class="sidebar-inner">
+
+        <!-- File & Canvas -->
+        <details class="accordion-item" open>
+          <summary class="accordion-trigger">
+            <span class="clean-cluster">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span class="mono-subtitle">File & Canvas</span>
+            </span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="accordion-content clean-stack">
+            <div id="file-dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload a 3D model, image, or video">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p>Click or drag a 3D model, image, or video</p>
+            </div>
+            <input type="file" id="file-input" accept=".obj,.glb,.gltf,.mp4,.webm,.mov,.jpg,.jpeg,.png,.gif,.bmp,.webp" style="display:none" />
+            <div id="file-status" class="status-message" style="display:none"></div>
+
+            <div class="field">
+              <label class="mono-label">Aspect Ratio</label>
+              <div class="clean-cluster" style="flex-wrap:nowrap;">
+                <input type="number" id="aspect-width" class="minimal-input" value="1" style="flex:1" />
+                <span class="mono-label">:</span>
+                <input type="number" id="aspect-height" class="minimal-input" value="1" style="flex:1" />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Light -->
+        <details class="accordion-item">
+          <summary class="accordion-trigger">
+            <span class="clean-cluster">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+              <span class="mono-subtitle">Light</span>
+            </span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="accordion-content clean-stack">
+            <div class="field slider-row">
+              <label class="mono-label" id="light-angle-label">Angle: -45°</label>
+              <input type="range" id="light-angle" min="-180" max="180" step="5" value="-45" />
+            </div>
+            <div class="field slider-row">
+              <label class="mono-label" id="light-intensity-label">Intensity: 80%</label>
+              <input type="range" id="light-intensity" min="0" max="200" step="5" value="80" />
+            </div>
+          </div>
+        </details>
+
+        <!-- Effect Settings -->
+        <details class="accordion-item" open>
+          <summary class="accordion-trigger">
+            <span class="clean-cluster">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+              <span class="mono-subtitle">Effect Settings</span>
+            </span>
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="accordion-content clean-stack">
+
+            <div class="field">
+              <label class="mono-label">Effect Presets</label>
+              <div class="preset-dropdown">
+                <button type="button" id="preset-trigger" class="minimal-input preset-trigger">
+                  <span id="preset-trigger-label" style="color: var(--muted-foreground)">Choose a preset...</span>
+                  <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div id="preset-panel" class="preset-panel"></div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="mono-label">Effect Type</label>
+              <select id="effect-type-select" class="minimal-input">
+                <option value="none">None</option>
+                <option value="ascii" selected>ASCII</option>
+                <option value="bayer">Bayer Dither</option>
+                <option value="noise">Noise Dither</option>
+              </select>
+            </div>
+
+            <div id="effect-params-group" class="clean-stack">
+            <div id="levels-group" class="clean-stack divider-top">
+              <div class="mono-subtitle">Levels</div>
+              <div class="field slider-row">
+                <label class="mono-label" id="brightness-label">Brightness: 0.00</label>
+                <input type="range" id="brightness-range" min="-0.5" max="0.5" step="0.01" value="0" />
+              </div>
+              <div class="field slider-row">
+                <label class="mono-label" id="contrast-label">Contrast: 1.00</label>
+                <input type="range" id="contrast-range" min="0.5" max="2.5" step="0.01" value="1" />
+              </div>
+            </div>
+
+            <div id="ascii-group" class="clean-stack divider-top">
+              <div class="mono-subtitle">ASCII</div>
+
+              <div class="field">
+                <label class="mono-label">Font</label>
+                <select id="ascii-font-select" class="minimal-input"></select>
+              </div>
+
+              <div class="field">
+                <label class="mono-label">Characters / Emojis</label>
+                <input type="text" id="ascii-characters-input" class="minimal-input" value=" .:-=+*#%@" />
+              </div>
+
+              <div class="field slider-row">
+                <label class="mono-label" id="ascii-resolution-label">ASCII Resolution: 6</label>
+                <input type="range" id="ascii-resolution-range" min="2" max="14" step="1" value="6" />
+              </div>
+
+              <div class="field slider-row">
+                <label class="mono-label" id="ascii-scale-label">Character Scale: 0.90</label>
+                <input type="range" id="ascii-scale-range" min="0.1" max="1.5" step="0.05" value="0.9" />
+              </div>
+
+              <!-- ASCIIColorTrio -->
+              <div class="clean-stack">
+                <div class="switch-row">
+                  <label class="mono-label" for="colortrio-toggle">3-Color characters</label>
+                  <label class="switch">
+                    <input type="checkbox" id="colortrio-toggle" />
+                    <span class="track"><span class="thumb"></span></span>
+                  </label>
+                </div>
+
+                <div id="ascii-color-single-wrap" class="palette-swatch-card">
+                  <div class="palette-swatch-head"><span class="mono-label">Character Color</span></div>
+                  <div class="color-row">
+                    <input type="color" id="ascii-color-single" value="#000000" />
+                    <input type="text" id="ascii-color-single-hex" value="#000000" />
+                  </div>
+                </div>
+
+                <div id="ascii-color-trio-wrap" style="display:none" class="clean-stack">
+                  <div class="palette-swatch-card">
+                    <div class="palette-swatch-head"><span class="mono-label">Shadows</span></div>
+                    <div class="color-row">
+                      <input type="color" id="trio-color-0" value="#000000" />
+                      <input type="text" id="trio-hex-0" value="#000000" />
+                    </div>
+                  </div>
+                  <div class="palette-swatch-card">
+                    <div class="palette-swatch-head"><span class="mono-label">Midtones</span></div>
+                    <div class="color-row">
+                      <input type="color" id="trio-color-1" value="#333333" />
+                      <input type="text" id="trio-hex-1" value="#333333" />
+                    </div>
+                  </div>
+                  <div class="palette-swatch-card">
+                    <div class="palette-swatch-head"><span class="mono-label">Highlights</span></div>
+                    <div class="color-row">
+                      <input type="color" id="trio-color-2" value="#666666" />
+                      <input type="text" id="trio-hex-2" value="#666666" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="dither-group" class="clean-stack divider-top" style="display:none">
+              <div class="mono-subtitle">Dither</div>
+              <div id="dither-matrix-group" class="field">
+                <label class="mono-label">Matrix Type</label>
+                <select id="dither-matrix-select" class="minimal-input">
+                  <option value="0">2x2 Bayer</option>
+                  <option value="1">4x4 Bayer</option>
+                  <option value="2" selected>8x8 Bayer</option>
+                  <option value="3">16x16 Bayer</option>
+                </select>
+              </div>
+              <div class="field slider-row">
+                <label class="mono-label" id="dither-scale-label">Dither Scale: 3</label>
+                <input type="range" id="dither-scale-range" min="1" max="32" step="1" value="3" />
+              </div>
+            </div>
+
+            <div class="clean-stack divider-top">
+              <div class="switch-row">
+                <label class="mono-label" for="palette-toggle">Color Palette</label>
+                <label class="switch">
+                  <input type="checkbox" id="palette-toggle" checked />
+                  <span class="track"><span class="thumb"></span></span>
+                </label>
+              </div>
+
+              <div id="bg-color-wrap" style="display:none" class="field">
+                <label class="mono-label">Background</label>
+                <div class="color-row">
+                  <input type="color" id="bg-color" value="#eeeeee" />
+                  <input type="text" id="bg-color-hex" value="#eeeeee" />
+                </div>
+              </div>
+
+              <div id="palette-wrap" class="clean-stack">
+                <div class="switch-row">
+                  <label class="mono-label" for="reverse-palette-toggle">Reverse Palette</label>
+                  <input type="checkbox" id="reverse-palette-toggle" class="checkbox" />
+                </div>
+                <div id="palette-swatches" class="clean-stack"></div>
+              </div>
+            </div>
+            </div><!-- /effect-params-group -->
+
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===================== Canvas ===================== -->
+    <main class="canvas-main">
+      <div id="canvas-card" class="canvas-card">
+        <div id="canvas-mount"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Export modal -->
+<div id="export-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export Canvas
+    </div>
+    <div class="modal-desc">Choose the format and scale for your canvas export.</div>
+    <div class="modal-body">
+      <div class="field">
+        <label class="mono-label">Format</label>
+        <select id="export-format" class="minimal-input">
+          <option value="png">PNG Image</option>
+          <option value="svg">SVG Vector</option>
+          <option value="mp4">WebM Video</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="mono-label">Scale</label>
+        <select id="export-scale" class="minimal-input">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+          <option value="4">4x</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="mono-label">Export Size</label>
+        <div id="export-size-label" class="export-size-box">— × —</div>
+      </div>
+      <div id="export-video-note" class="mono-label" style="display:none; color: var(--muted-foreground);">
+        Video will be 5 seconds long with smooth rotation
+      </div>
+      <div id="export-svg-note" class="mono-label" style="display:none; color: var(--muted-foreground);">
+        Exports real vector shapes — ASCII text, or a color-block grid for Bayer/Noise/None.
+      </div>
+      <div id="export-progress-wrap" style="display:none" class="clean-stack">
+        <div class="mono-label" id="export-progress-label">Exporting... 0%</div>
+        <div class="progress-track"><div id="export-progress-fill" class="progress-fill"></div></div>
+      </div>
+      <div class="modal-actions">
+        <button id="export-cancel" class="minimal-button" type="button">Cancel</button>
+        <button id="export-start" class="minimal-button-primary" type="button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span id="export-start-label">Export PNG</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Custom cursor -->
+<div id="custom-cursor">
+  <div id="cursor-default"><svg viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg"><path d="M29.8193 26.9734L28.8807 23.4694L27.1536 23.9324L26.2449 20.5421L28.4094 19.962L30.9596 17.4118L30.4837 15.6352L30.0207 13.9084L28.2936 14.3711L27.8309 12.644L26.1037 13.1064L25.641 11.3793L23.9139 11.8423L23.4512 10.1152L21.7241 10.5779L21.2611 8.85049L19.5338 9.31352L19.0711 7.5864L17.344 8.04882L16.8812 6.32201L15.1542 6.78474L14.6912 5.05762L12.9639 5.52034L12.5014 3.79322L10.7741 4.25594L10.3113 2.52883L8.58437 2.99155L8.12137 1.26444L6.39431 1.72716L5.93159 4.11438e-05L4.15511 0.476216L1.60475 3.02639L9.48536 32.4372L11.262 31.9613L12.9893 31.4986L15.5393 28.9481L15.3333 28.1795L16.7363 26.7763L16.8036 26.7583L16.5977 25.9896L16.9257 25.6614L17.6585 28.3962L19.3856 27.9334L20.3112 31.3877L22.0383 30.9249L22.501 32.6521L26.0047 31.7132L28.5549 29.1633L28.3489 28.3943L29.752 26.9915L29.8193 26.9734Z" fill="black"/><path d="M22.7599 29.6756L21.0326 30.1383L20.1071 26.684L18.3797 27.1468L17.4538 23.6904L15.46 25.6849L15.6557 26.4145L14.1957 27.8745L14.4017 28.6434L12.4611 30.5839L10.2069 31.1881L2.74257 3.33115L4.68296 1.39069L5.21029 1.2495L5.67329 2.97661L7.40031 2.51359L7.86307 4.241L9.59 3.77828L10.053 5.5054L11.78 5.04268L12.2428 6.76979L13.9701 6.30707L14.4329 8.03418L16.1601 7.57146L16.6228 9.29827L18.3499 8.83555L18.8125 10.5627L20.5399 10.0999L21.0028 11.8274L22.7299 11.3643L23.1927 13.0918L24.9198 12.6287L25.3825 14.3558L27.1096 13.8931L27.5723 15.6202L29.2998 15.1575L29.8218 17.1071L27.8813 19.0473L24.9956 19.8208L26.432 25.1816L28.1595 24.7188L28.6711 26.6296L27.2111 28.0893L27.4174 28.8583L25.4769 30.7988L23.2226 31.4027L22.7599 29.6756Z" fill="black"/><path d="M28.2755 14.4023L27.8128 12.6751L26.0857 13.1379L25.623 11.4108L23.8959 11.8735L23.4331 10.1464L21.7059 10.6091L21.243 8.88197L19.5158 9.34469L19.053 7.61758L17.326 8.0803L16.8632 6.35318L15.1361 6.8159L14.6732 5.08879L12.9459 5.55151L12.4833 3.8244L10.7561 4.28712L10.2931 2.56L8.5662 3.02273L8.10345 1.29561L6.3763 1.75864L5.91342 0.031522L4.18624 0.49425L12.0536 29.8558L13.7809 29.3931L15.5082 28.9301L15.0452 27.2033L16.7725 26.7403L16.3095 25.0131L18.0368 24.5504L17.5739 22.8233L19.3012 22.3606L20.2267 25.8148L21.954 25.3518L22.8796 28.8063L24.6064 28.3436L25.0692 30.0707L28.5237 29.1449L28.061 27.4178L29.7881 26.9551L28.8627 23.5009L27.1352 23.9636L26.2098 20.5094L24.4827 20.9721L24.0199 19.245L30.9284 17.3938L30.4657 15.6667L30.0026 13.9395L28.2755 14.4023Z" fill="white"/><path d="M13.7809 29.3931L12.0536 29.8559L4.18624 0.49427L5.91342 0.0315411L13.7809 29.3931Z" fill="black"/><path d="M8.5662 3.02281L6.83902 3.48584L6.37629 1.75872L8.10344 1.29569L8.5662 3.02281Z" fill="black"/><path d="M10.7562 4.28716L9.02906 4.75019L8.56634 3.02277L10.2933 2.56004L10.7562 4.28716Z" fill="black"/><path d="M12.9456 5.55152L11.2186 6.01455L10.7558 4.28713L12.483 3.8244L12.9456 5.55152Z" fill="black"/><path d="M15.136 6.81601L13.4088 7.27905L12.9459 5.55162L14.6731 5.0889L15.136 6.81601Z" fill="black"/><path d="M17.3258 8.0804L15.5985 8.54312L15.1359 6.816L16.8631 6.35328L17.3258 8.0804Z" fill="black"/><path d="M19.5158 9.34475L17.7888 9.80748L17.326 8.08036L19.053 7.61764L19.5158 9.34475Z" fill="black"/><path d="M21.7062 10.6091L19.979 11.0718L19.516 9.34471L21.2433 8.88199L21.7062 10.6091Z" fill="black"/><path d="M23.896 11.8734L22.1687 12.3365L21.7061 10.6091L23.4333 10.1463L23.896 11.8734Z" fill="black"/><path d="M26.086 13.138L24.3588 13.6007L23.8961 11.8736L25.6232 11.4108L26.086 13.138Z" fill="black"/><path d="M28.2754 14.4023L26.5483 14.865L26.0856 13.1379L27.8127 12.6752L28.2754 14.4023Z" fill="black"/><path d="M30.4658 15.6667L28.7387 16.1294L28.2756 14.4023L30.0028 13.9396L30.4658 15.6667Z" fill="black"/><path d="M30.9285 17.3938L22.2926 19.7078L21.8299 17.9807L30.4657 15.6667L30.9285 17.3938Z" fill="black"/><path d="M24.4828 20.9722L22.7554 21.4349L22.2927 19.7078L24.0201 19.2451L24.4828 20.9722Z" fill="black"/><path d="M19.3014 22.3607L17.5741 22.8234L17.1114 21.0963L18.8385 20.6332L19.3014 22.3607Z" fill="black"/><path d="M21.9542 25.3518L20.2269 25.8149L19.3015 22.3606L21.0286 21.8979L21.9542 25.3518Z" fill="black"/><path d="M24.6062 28.3436L22.8793 28.8063L21.9537 25.3518L23.6807 24.8891L24.6062 28.3436Z" fill="black"/><path d="M28.5238 29.1449L25.0693 30.0707L24.6065 28.3436L28.0611 27.4178L28.5238 29.1449Z" fill="black"/><path d="M27.1353 23.9637L25.4082 24.4264L24.4827 20.9722L26.2098 20.5094L27.1353 23.9637Z" fill="black"/><path d="M29.7878 26.9552L28.0607 27.4179L27.135 23.9636L28.8624 23.5009L29.7878 26.9552Z" fill="black"/><path d="M18.0368 24.5504L16.3095 25.0131L15.8469 23.286L17.5739 22.8233L18.0368 24.5504Z" fill="black"/><path d="M16.7724 26.7403L15.0451 27.2033L14.5824 25.4759L16.3094 25.0132L16.7724 26.7403Z" fill="black"/><path d="M15.5082 28.9302L13.7809 29.3932L13.3179 27.6661L15.0452 27.2034L15.5082 28.9302Z" fill="black"/></svg></div>
+  <div id="cursor-grab" style="display:none"><svg viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg"><path d="M29.5209 22.4912L28.6345 19.1816L29.7338 18.0821L29.7868 18.0682L27.2377 8.5549L25.884 8.91775L25.5214 7.56405L24.1682 7.92667L23.8051 6.57321L21.0979 7.29868L20.7355 5.94522L16.6751 7.0333L16.3125 5.6796L13.6054 6.40507L12.1549 0.990987L10.8014 1.3536L10.4386 0.000145207L7.69311 0.735913L6.70227 2.45199L6.70562 2.46348L4.70381 4.45044L7.23972 13.9134L4.18982 14.7306L2.19137 16.7291L2.56428 18.1211L3.28975 20.8282L4.64298 20.4654L5.00559 21.8191L6.35929 21.4562L7.08452 24.1634L8.43822 23.8005L9.16321 26.5075L10.5172 26.1451L11.2421 28.852L12.5958 28.4894L13.3211 31.1963L13.6839 32.5498L25.8653 29.2858L27.2569 28.9128L29.2558 26.9144L28.3689 23.6049L29.4687 22.5053L29.5209 22.4912Z" fill="black"/><path d="M13.1613 27.5102L11.8078 27.8728L11.0823 25.1659L9.72912 25.5285L9.00341 22.8216L7.65019 23.1842L6.92472 20.4773L5.57126 20.8399L5.20841 19.4864L3.85494 19.8491L3.08325 16.968L4.60389 15.4471L8.21902 14.4783L5.59617 4.69107L7.59966 2.70219L9.87354 0.979169L10.2362 2.33263L11.5899 1.97002L13.0406 7.38385L15.7477 6.65862L16.1101 8.01208L20.1705 6.924L20.5331 8.2777L23.2403 7.55223L23.6026 8.90569L24.9566 8.54308L25.3189 9.89654L26.6729 9.53392L28.8874 17.7986L27.7432 18.9428L28.6218 22.2219L27.4774 23.366L28.3638 26.6753L26.8437 28.1959L14.2494 31.5706L13.1613 27.5102Z" fill="black"/><path d="M25.8701 8.94182L25.5077 7.5886L24.1542 7.95122L23.7914 6.59752L21.0842 7.32299L20.7216 5.96953L16.6612 7.05762L16.2986 5.70392L13.5917 6.42939L12.141 1.0153L10.7878 1.37792L10.4247 0.0244561L7.71751 0.749927L8.08061 2.10339L6.72691 2.46601L9.99092 14.6474L8.6377 15.01L8.27508 13.6568L4.21422 14.7449L4.57684 16.0981L4.75839 16.7749L5.30231 18.8052L6.65577 18.4424L7.01863 19.7959L8.37209 19.4332L9.09756 22.1402L10.4508 21.7775L11.1765 24.4845L12.5297 24.1218L13.2547 26.829L14.6086 26.4662L15.3336 29.1733L15.6967 30.5268L27.8779 27.2628L29.2311 26.8999L28.1435 22.8395L29.4969 22.4769L28.4089 18.4163L29.7626 18.0537L27.224 8.57921L25.8701 8.94182Z" fill="white"/><path d="M12.4322 18.3454L11.0788 18.708L6.72667 2.46604L8.08037 2.10343L12.4322 18.3454Z" fill="black"/><path d="M10.7875 1.37803L8.08037 2.1035L7.71727 0.750042L10.4244 0.0245709L10.7875 1.37803Z" fill="black"/><path d="M15.4053 13.197L14.0516 13.5596L10.7878 1.37798L12.141 1.01537L15.4053 13.197Z" fill="black"/><path d="M16.6608 7.05768L13.9536 7.78291L13.5913 6.42945L16.2982 5.70398L16.6608 7.05768Z" fill="black"/><path d="M19.4654 12.109L18.1117 12.4716L17.0241 8.41095L18.3773 8.04857L19.4654 12.109Z" fill="black"/><path d="M21.0842 7.32303L17.0243 8.41088L16.6612 7.05766L20.7216 5.96957L21.0842 7.32303Z" fill="black"/><path d="M23.8881 12.3716L22.5344 12.7342L21.447 8.67669L22.8005 8.31383L23.8881 12.3716Z" fill="black"/><path d="M24.1541 7.95132L21.447 8.67679L21.0841 7.32309L23.7913 6.59762L24.1541 7.95132Z" fill="black"/><path d="M25.8699 8.9419L24.5167 9.30476L24.1541 7.9513L25.5075 7.58868L25.8699 8.9419Z" fill="black"/><path d="M29.7624 18.0537L28.4087 18.4163L25.8699 8.94185L27.2238 8.57924L29.7624 18.0537Z" fill="black"/><path d="M29.4966 22.477L28.1432 22.8396L27.0551 18.7793L28.4086 18.4164L29.4966 22.477Z" fill="black"/><path d="M29.2311 26.9L27.8778 27.2628L26.7898 23.2022L28.1435 22.8396L29.2311 26.9Z" fill="black"/><path d="M27.8776 27.2628L15.6965 30.5268L15.3334 29.1733L27.515 25.9093L27.8776 27.2628Z" fill="black"/><path d="M10.3535 16.0011L9.0003 16.3635L8.63769 15.01L9.99091 14.6474L10.3535 16.0011Z" fill="black"/><path d="M8.6377 15.0101L4.57684 16.0982L4.21422 14.7449L8.27508 13.6569L8.6377 15.0101Z" fill="black"/><path d="M6.6555 18.4425L5.30204 18.8053L4.57657 16.0982L5.93027 15.7356L6.6555 18.4425Z" fill="black"/><path d="M8.37166 19.4333L7.0182 19.7959L6.65535 18.4425L8.00904 18.0799L8.37166 19.4333Z" fill="black"/><path d="M10.4505 21.7776L9.09725 22.1402L8.37178 19.4333L9.72548 19.0707L10.4505 21.7776Z" fill="black"/><path d="M12.5295 24.122L11.1763 24.4846L10.4506 21.7777L11.804 21.4153L12.5295 24.122Z" fill="black"/><path d="M14.6083 26.4663L13.2543 26.8291L12.5293 24.122L13.8826 23.7594L14.6083 26.4663Z" fill="black"/><path d="M16.6874 28.8108L15.3337 29.1734L14.6087 26.4662L15.9619 26.1036L16.6874 28.8108Z" fill="black"/></svg></div>
+</div>
+
+<script type="module">
+// ===== three.js core + addons (CDN, pinned version) =====
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// ===== Shaders (ported verbatim from utils/shaders.ts) =====
+
+const LevelsEffect = {
+  uniforms: {
+    'tDiffuse': { value: null },
+    'uBrightness': { value: 0.0 },
+    'uContrast': { value: 1.0 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uBrightness;
+    uniform float uContrast;
+    varying vec2 vUv;
+
+    void main() {
+      vec4 color = texture2D(tDiffuse, vUv);
+      color.rgb += uBrightness;
+      color.rgb = (color.rgb - 0.5) * uContrast + 0.5;
+      gl_FragColor = color;
+    }
+  `
+};
+
+const ASCIIEffect = {
+  uniforms: {
+    'tDiffuse': { value: null },
+    'uResolution': { value: new THREE.Vector2() },
+    'uCharSize': { value: new THREE.Vector2(8.0, 8.0) },
+    'uCharSet': { value: null },
+    'uCharCount': { value: 0 },
+    'uColor': { value: new THREE.Color(0x000000) },
+    'uBackgroundColor': { value: new THREE.Color(0xffffff) },
+    'uUsePalette': { value: false },
+    'uPaletteMap': { value: null },
+    'uPaletteColorCount': { value: 0.0 },
+    'uUseColorTrio': { value: false },
+    'uColorTrio': { value: [new THREE.Color(0x000000), new THREE.Color(0x333333), new THREE.Color(0x666666)] }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uResolution;
+    uniform vec2 uCharSize;
+    uniform sampler2D uCharSet;
+    uniform float uCharCount;
+    uniform vec3 uColor;
+    uniform vec3 uBackgroundColor;
+    uniform bool uUsePalette;
+    uniform sampler2D uPaletteMap;
+    uniform float uPaletteColorCount;
+    uniform bool uUseColorTrio;
+    uniform vec3 uColorTrio[3];
+    varying vec2 vUv;
+
+    float getLuminance(vec3 color) {
+      return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+    }
+
+    vec3 getCharacterColor(float luminance) {
+      if (!uUseColorTrio) {
+        return uColor;
+      }
+
+      if (luminance < 0.33) {
+        return uColorTrio[0];
+      } else if (luminance < 0.66) {
+        return uColorTrio[1];
+      } else {
+        return uColorTrio[2];
+      }
+    }
+
+    void main() {
+      vec2 tileUV = floor(vUv * uResolution / uCharSize) * uCharSize / uResolution;
+      vec4 originalColor = texture2D(tDiffuse, tileUV);
+      float luminance = getLuminance(originalColor.rgb);
+
+      vec3 finalBackgroundColor;
+      if (uUsePalette && uPaletteColorCount > 0.0) {
+        float colorIndex = floor(luminance * (uPaletteColorCount - 0.999));
+        float colorU = (colorIndex + 0.5) / uPaletteColorCount;
+        finalBackgroundColor = texture2D(uPaletteMap, vec2(colorU, 0.5)).rgb;
+      } else {
+        finalBackgroundColor = uBackgroundColor;
+      }
+
+      float charIndex = floor(luminance * (uCharCount - 0.999));
+      vec2 charUV = (vUv * uResolution / uCharSize) - floor(vUv * uResolution / uCharSize);
+      charUV.x /= uCharCount;
+      charUV.x += charIndex / uCharCount;
+      vec4 charTexel = texture2D(uCharSet, charUV);
+
+      vec3 characterColor = getCharacterColor(luminance);
+      gl_FragColor = vec4(mix(finalBackgroundColor, characterColor, charTexel.r), 1.0);
+    }
+  `
+};
+
+const DitherEffect = {
+  uniforms: {
+    'tDiffuse': { value: null },
+    'uResolution': { value: new THREE.Vector2() },
+    'uPaletteMap': { value: null },
+    'uPaletteColorCount': { value: 0.0 },
+    'uMatrixType': { value: 2 },
+    'uDitherScale': { value: 3.0 },
+    'uDitherMode': { value: 0 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uResolution;
+    uniform sampler2D uPaletteMap;
+    uniform float uPaletteColorCount;
+    uniform int uMatrixType;
+    uniform float uDitherScale;
+    uniform int uDitherMode;
+    varying vec2 vUv;
+
+    float getLuminance(vec3 color) {
+      return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+    }
+
+    float rand(vec2 co) {
+      return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+    }
+
+    float getBayerValue(int x, int y) {
+      const float bayer2[4] = float[](0.0, 2.0, 3.0, 1.0);
+      const float bayer4[16] = float[](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+      const float bayer8[64] = float[](0.0, 32.0, 8.0, 40.0, 2.0, 34.0, 10.0, 42.0, 48.0, 16.0, 56.0, 24.0, 50.0, 18.0, 58.0, 26.0, 12.0, 44.0, 4.0, 36.0, 14.0, 46.0, 6.0, 38.0, 60.0, 28.0, 52.0, 20.0, 62.0, 30.0, 54.0, 22.0, 3.0, 35.0, 11.0, 43.0, 1.0, 33.0, 9.0, 41.0, 51.0, 19.0, 59.0, 27.0, 49.0, 17.0, 57.0, 25.0, 15.0, 47.0, 7.0, 39.0, 13.0, 45.0, 5.0, 37.0, 63.0, 31.0, 55.0, 23.0, 61.0, 29.0, 53.0, 21.0);
+      const float bayer16[256] = float[](0.0, 128.0, 32.0, 160.0, 8.0, 136.0, 40.0, 168.0, 2.0, 130.0, 34.0, 162.0, 10.0, 138.0, 42.0, 170.0, 192.0, 64.0, 224.0, 96.0, 200.0, 72.0, 232.0, 104.0, 194.0, 66.0, 226.0, 98.0, 202.0, 74.0, 234.0, 106.0, 48.0, 176.0, 16.0, 144.0, 56.0, 184.0, 24.0, 152.0, 50.0, 178.0, 18.0, 146.0, 58.0, 186.0, 26.0, 154.0, 240.0, 112.0, 208.0, 80.0, 248.0, 120.0, 216.0, 88.0, 242.0, 114.0, 210.0, 82.0, 250.0, 122.0, 218.0, 90.0, 12.0, 140.0, 44.0, 172.0, 4.0, 132.0, 36.0, 164.0, 14.0, 142.0, 46.0, 174.0, 6.0, 134.0, 38.0, 166.0, 204.0, 76.0, 236.0, 108.0, 196.0, 68.0, 228.0, 100.0, 206.0, 78.0, 238.0, 110.0, 198.0, 70.0, 230.0, 102.0, 60.0, 188.0, 28.0, 156.0, 52.0, 180.0, 20.0, 148.0, 62.0, 190.0, 30.0, 158.0, 54.0, 182.0, 22.0, 150.0, 252.0, 124.0, 220.0, 92.0, 244.0, 116.0, 212.0, 84.0, 254.0, 126.0, 222.0, 94.0, 246.0, 118.0, 214.0, 86.0, 3.0, 131.0, 35.0, 163.0, 11.0, 139.0, 43.0, 171.0, 1.0, 129.0, 33.0, 161.0, 9.0, 137.0, 41.0, 169.0, 195.0, 67.0, 227.0, 99.0, 203.0, 75.0, 235.0, 107.0, 193.0, 65.0, 225.0, 97.0, 201.0, 73.0, 233.0, 105.0, 51.0, 179.0, 19.0, 147.0, 59.0, 187.0, 27.0, 155.0, 49.0, 177.0, 17.0, 145.0, 57.0, 185.0, 25.0, 153.0, 243.0, 115.0, 211.0, 83.0, 251.0, 123.0, 219.0, 91.0, 241.0, 113.0, 209.0, 81.0, 249.0, 121.0, 217.0, 89.0, 15.0, 143.0, 47.0, 175.0, 7.0, 135.0, 39.0, 167.0, 13.0, 141.0, 45.0, 173.0, 5.0, 133.0, 37.0, 165.0, 207.0, 79.0, 239.0, 111.0, 199.0, 71.0, 231.0, 103.0, 205.0, 77.0, 237.0, 109.0, 197.0, 69.0, 229.0, 101.0, 63.0, 191.0, 31.0, 159.0, 55.0, 183.0, 23.0, 151.0, 61.0, 189.0, 29.0, 157.0, 53.0, 181.0, 21.0, 149.0, 255.0, 127.0, 223.0, 95.0, 247.0, 119.0, 215.0, 87.0, 253.0, 125.0, 221.0, 93.0, 245.0, 117.0, 213.0, 85.0);
+
+      if (uMatrixType == 0) { return bayer2[x + y * 2] / 4.0; }
+      if (uMatrixType == 1) { return bayer4[x + y * 4] / 16.0; }
+      if (uMatrixType == 2) { return bayer8[x + y * 8] / 64.0; }
+      if (uMatrixType == 3) { return bayer16[x + y * 16] / 256.0; }
+      return 0.0;
+    }
+
+    void main() {
+      vec3 originalColor = texture2D(tDiffuse, vUv).rgb;
+      float luminance = getLuminance(originalColor);
+      float threshold;
+
+      if (uDitherMode == 0) {
+        int matrixSize;
+        if (uMatrixType == 0) { matrixSize = 2; }
+        else if (uMatrixType == 1) { matrixSize = 4; }
+        else if (uMatrixType == 3) { matrixSize = 16; }
+        else { matrixSize = 8; }
+
+        int x = int(mod(gl_FragCoord.x, float(matrixSize)));
+        int y = int(mod(gl_FragCoord.y, float(matrixSize)));
+        threshold = getBayerValue(x, y);
+      } else {
+        threshold = rand(vUv);
+      }
+
+      float adjustedLuminance = luminance + (threshold - 0.5) / uDitherScale;
+      float colorIndex = floor(adjustedLuminance * (uPaletteColorCount - 0.999));
+      float colorU = (colorIndex + 0.5) / uPaletteColorCount;
+      vec3 finalColor = texture2D(uPaletteMap, vec2(colorU, 0.5)).rgb;
+
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `
+};
+
+function createAsciiCharTexture(characters, scale, fontFamily) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const charSize = 64;
+  const charArray = Array.from(characters);
+
+  canvas.width = charSize * charArray.length;
+  canvas.height = charSize;
+
+  ctx.fillStyle = 'white';
+  ctx.font = `${charSize * scale}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let i = 0; i < charArray.length; i++) {
+    ctx.fillText(charArray[i], i * charSize + charSize / 2, charSize / 2);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+
+  return { texture, count: charArray.length };
+}
+
+function createPaletteTexture(colorStops) {
+  const canvas = document.createElement('canvas');
+  const width = colorStops.length > 0 ? colorStops.length : 1;
+  const height = 1;
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  if (colorStops.length === 0) {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+  } else {
+    colorStops.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(i, 0, 1, height);
+    });
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+  return texture;
+}
+
+// ===== Three.js renderer engine (ported from components/ThreeJSRenderer.tsx) =====
+
+class ThreeJSRenderer {
+  constructor(mountEl, { width, height, aspectRatio, effectSettings, autoRotate, onVideoLoad, onImageLoad, onModelLoad }) {
+    this.mountEl = mountEl;
+    this.width = width;
+    this.height = height;
+    this.aspectRatio = aspectRatio;
+    this.effectSettings = effectSettings;
+    this.autoRotate = autoRotate;
+    this.onVideoLoad = onVideoLoad;
+    this.onImageLoad = onImageLoad;
+    this.onModelLoad = onModelLoad;
+
+    this.scene = null;
+    this.renderer = null;
+    this.camera = null;
+    this.controls = null;
+    this.composer = null;
+    this.levelsPass = null;
+    this.asciiPass = null;
+    this.ditherPass = null;
+
+    this.directionalLight = null;
+    this.ambientLight = null;
+    this.fillLight = null;
+    this.rimLight = null;
+    this.hemisphereLight = null;
+
+    this.currentModel = null;
+    this.animationId = null;
+    this.videoElement = null;
+    this.isVideo = false;
+    this.isImage = false;
+    this.initialized = false;
+
+    this._animate = this._animate.bind(this);
+  }
+
+  init() {
+    if (!this.mountEl || this.initialized) return;
+    this.initialized = true;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xeeeeee);
+    this.scene = scene;
+
+    const camera = new THREE.PerspectiveCamera(50, this.aspectRatio, 0.1, 1000);
+    camera.position.set(0, 1, 5);
+    this.camera = camera;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(this.width, this.height);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 2.0;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.mountEl.appendChild(renderer.domElement);
+    this.renderer = renderer;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2.5);
+    scene.add(ambientLight);
+    this.ambientLight = ambientLight;
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
+    directionalLight.position.set(5, 10, 7.5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.bias = -0.0001;
+    scene.add(directionalLight);
+    this.directionalLight = directionalLight;
+
+    const fillLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    fillLight.position.set(-5, 5, -7.5);
+    scene.add(fillLight);
+    this.fillLight = fillLight;
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    rimLight.position.set(0, -5, 5);
+    scene.add(rimLight);
+    this.rimLight = rimLight;
+
+    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    scene.add(hemisphereLight);
+    this.hemisphereLight = hemisphereLight;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = this.autoRotate;
+    controls.autoRotateSpeed = 1.0;
+    controls.minDistance = 0.5;
+    controls.maxDistance = 40;
+    this.controls = controls;
+
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const levelsPass = new ShaderPass(LevelsEffect);
+    composer.addPass(levelsPass);
+    this.levelsPass = levelsPass;
+
+    const asciiPass = new ShaderPass(ASCIIEffect);
+    composer.addPass(asciiPass);
+    this.asciiPass = asciiPass;
+
+    const ditherPass = new ShaderPass(DitherEffect);
+    composer.addPass(ditherPass);
+    this.ditherPass = ditherPass;
+
+    this.composer = composer;
+
+    // Default model (torus knot)
+    const geometry = new THREE.TorusKnotGeometry(1, 0.3, 128, 16);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x60a5fa,
+      roughness: 0.5,
+      metalness: 0.5
+    });
+    const torusKnot = new THREE.Mesh(geometry, material);
+    this.setupModel(torusKnot);
+
+    this.updateEffectSettings(this.effectSettings);
+  }
+
+  setupModel(model) {
+    if (!this.scene || !this.controls || !this.camera) return;
+
+    if (this.currentModel) {
+      this.scene.remove(this.currentModel);
+    }
+
+    this.isVideo = false;
+    this.isImage = false;
+
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    model.position.sub(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 2.5 / maxDim;
+    model.scale.setScalar(scale);
+
+    model.traverse((node) => {
+      if (node instanceof THREE.Mesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+      }
+    });
+
+    this.currentModel = model;
+    this.scene.add(model);
+
+    this.controls.reset();
+    this.controls.target.copy(model.position);
+    this.camera.position.set(
+      model.position.x,
+      model.position.y + size.y * scale * 0.5,
+      model.position.z + size.z * scale * 2
+    );
+    this.camera.lookAt(model.position);
+    this.controls.update();
+
+    this.onModelLoad?.(model);
+  }
+
+  setupVideoPlane(videoElement) {
+    if (!this.scene || !this.controls || !this.camera) return;
+
+    if (this.currentModel) {
+      this.scene.remove(this.currentModel);
+    }
+
+    this.isVideo = true;
+    this.isImage = false;
+
+    const videoTexture = new THREE.VideoTexture(videoElement);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+
+    const videoAspectRatio = videoElement.videoWidth / videoElement.videoHeight;
+
+    const planeGeometry = new THREE.PlaneGeometry(videoAspectRatio * 2, 2);
+    const planeMaterial = new THREE.MeshBasicMaterial({
+      map: videoTexture,
+      side: THREE.DoubleSide
+    });
+
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.position.set(0, 0, 0);
+
+    this.currentModel = plane;
+    this.scene.add(plane);
+
+    const fovRadians = (50 * Math.PI) / 180;
+    const planeHeight = 2;
+    const optimalDistance = (planeHeight / 2) / Math.tan(fovRadians / 2);
+
+    this.controls.reset();
+    this.controls.target.set(0, 0, 0);
+    this.camera.position.set(0, 0, optimalDistance);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.up.set(0, 1, 0);
+    this.controls.update();
+
+    this.onVideoLoad?.({ width: videoElement.videoWidth, height: videoElement.videoHeight });
+    this.onModelLoad?.(plane);
+  }
+
+  setupImagePlane(imageElement) {
+    if (!this.scene || !this.controls || !this.camera) return;
+
+    if (this.currentModel) {
+      this.scene.remove(this.currentModel);
+    }
+
+    this.isImage = true;
+    this.isVideo = false;
+
+    const imageTexture = new THREE.Texture(imageElement);
+    imageTexture.needsUpdate = true;
+    imageTexture.minFilter = THREE.LinearFilter;
+    imageTexture.magFilter = THREE.LinearFilter;
+
+    const imageAspectRatio = imageElement.naturalWidth / imageElement.naturalHeight;
+
+    const planeGeometry = new THREE.PlaneGeometry(imageAspectRatio * 2, 2);
+    const planeMaterial = new THREE.MeshBasicMaterial({
+      map: imageTexture,
+      side: THREE.DoubleSide
+    });
+
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.position.set(0, 0, 0);
+
+    this.currentModel = plane;
+    this.scene.add(plane);
+
+    const fovRadians = (50 * Math.PI) / 180;
+    const planeHeight = 2;
+    const optimalDistance = (planeHeight / 2) / Math.tan(fovRadians / 2);
+
+    this.controls.reset();
+    this.controls.target.set(0, 0, 0);
+    this.camera.position.set(0, 0, optimalDistance);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.up.set(0, 1, 0);
+    this.controls.update();
+
+    this.onImageLoad?.({ width: imageElement.naturalWidth, height: imageElement.naturalHeight });
+    this.onModelLoad?.(plane);
+  }
+
+  loadFile(file) {
+    if (!file) return Promise.reject('No file provided');
+
+    const fileURL = URL.createObjectURL(file);
+    const fileName = file.name.toLowerCase();
+
+    return new Promise((resolve, reject) => {
+      if (fileName.match(/\.(mp4|webm|mov)$/)) {
+        if (this.videoElement) {
+          this.videoElement.pause();
+          this.videoElement.src = '';
+          this.videoElement = null;
+        }
+
+        const video = document.createElement('video');
+        video.src = fileURL;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+
+        video.addEventListener('loadedmetadata', () => {
+          this.videoElement = video;
+          this.setupVideoPlane(video);
+          video.play();
+          resolve(this.currentModel);
+        });
+
+        video.addEventListener('error', (error) => reject(error));
+        video.load();
+      } else if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
+        if (this.videoElement) {
+          this.videoElement.pause();
+          this.videoElement.src = '';
+          this.videoElement = null;
+        }
+
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+
+        image.onload = () => {
+          this.setupImagePlane(image);
+          resolve(this.currentModel);
+        };
+        image.onerror = (error) => reject(error);
+        image.src = fileURL;
+      } else if (fileName.endsWith('.obj')) {
+        if (this.videoElement) {
+          this.videoElement.pause();
+          this.videoElement.src = '';
+          this.videoElement = null;
+        }
+
+        const loader = new OBJLoader();
+        loader.load(
+          fileURL,
+          (object) => {
+            this.setupModel(object);
+            resolve(object);
+          },
+          undefined,
+          (error) => reject(error)
+        );
+      } else if (fileName.match(/\.(glb|gltf)$/)) {
+        if (this.videoElement) {
+          this.videoElement.pause();
+          this.videoElement.src = '';
+          this.videoElement = null;
+        }
+
+        const loader = new GLTFLoader();
+        loader.load(
+          fileURL,
+          (gltf) => {
+            this.setupModel(gltf.scene);
+            resolve(gltf.scene);
+          },
+          undefined,
+          (error) => reject(error)
+        );
+      } else {
+        reject('Unsupported file format');
+      }
+    });
+  }
+
+  updateLighting() {
+    if (!this.directionalLight) return;
+
+    const lighting = this.effectSettings.lighting || {};
+    const angle = (lighting.directionalAngle ?? -45) * (Math.PI / 180);
+    const intensity = (lighting.intensity ?? 80) / 100;
+
+    const distance = 10;
+    const x = Math.sin(angle) * distance;
+    const z = Math.cos(angle) * distance;
+    const y = 10;
+
+    this.directionalLight.position.set(x, y, z);
+    this.directionalLight.intensity = 3.0 * intensity;
+
+    if (this.ambientLight) this.ambientLight.intensity = 2.5 * intensity;
+    if (this.fillLight) this.fillLight.intensity = 2.0 * intensity;
+    if (this.rimLight) this.rimLight.intensity = 1.5 * intensity;
+    if (this.hemisphereLight) this.hemisphereLight.intensity = 1.0 * intensity;
+  }
+
+  updateEffectSettings(effectSettings) {
+    this.effectSettings = effectSettings;
+    if (!this.levelsPass || !this.asciiPass || !this.ditherPass || !this.scene) return;
+
+    const { effectType, brightness, contrast, ascii, dither, colors, target } = effectSettings;
+
+    this.updateLighting();
+
+    this.levelsPass.enabled = false;
+    this.asciiPass.enabled = false;
+    this.ditherPass.enabled = false;
+
+    if (effectType === 'none') {
+      let noEffectBackgroundColor;
+      if (target?.background?.type === 'solid') {
+        noEffectBackgroundColor = target.background.solidColor || '#eeeeee';
+      } else if (target?.background?.type === 'transparent') {
+        noEffectBackgroundColor = null;
+      } else {
+        noEffectBackgroundColor = effectSettings.isDark ? '#1f2937' : '#eeeeee';
+      }
+
+      this.scene.background = noEffectBackgroundColor === null ? null : new THREE.Color(noEffectBackgroundColor);
+      return;
+    }
+
+    this.levelsPass.enabled = true;
+    this.levelsPass.uniforms.uBrightness.value = brightness;
+    this.levelsPass.uniforms.uContrast.value = contrast;
+
+    const activeColors = colors.palette.filter((_, index) => colors.active[index]);
+    const paletteTexture = createPaletteTexture(activeColors);
+
+    let finalBackgroundColor;
+    if (target?.background?.type === 'solid') {
+      finalBackgroundColor = target.background.solidColor || '#eeeeee';
+    } else if (target?.background?.type === 'transparent') {
+      finalBackgroundColor = null;
+    } else {
+      finalBackgroundColor = colors.background;
+    }
+
+    if (effectType === 'ascii') {
+      this.asciiPass.enabled = true;
+
+      this.asciiPass.uniforms.uCharSize.value.set(ascii.resolution, ascii.resolution);
+      this.asciiPass.uniforms.uResolution.value.set(this.width, this.height);
+
+      const { texture, count } = createAsciiCharTexture(ascii.characters, ascii.scale, ascii.font);
+      if (this.asciiPass.uniforms.uCharSet.value) {
+        this.asciiPass.uniforms.uCharSet.value.dispose();
+      }
+      this.asciiPass.uniforms.uCharSet.value = texture;
+      this.asciiPass.uniforms.uCharCount.value = count;
+
+      this.asciiPass.uniforms.uColor.value.set(ascii.color);
+      this.asciiPass.uniforms.uUsePalette.value = colors.usePalette;
+      this.asciiPass.uniforms.uUseColorTrio.value = ascii.useColorTrio;
+
+      if (ascii.useColorTrio && ascii.colorTrio) {
+        this.asciiPass.uniforms.uColorTrio.value = ascii.colorTrio.map((color) => new THREE.Color(color));
+      }
+
+      if (colors.usePalette) {
+        if (this.asciiPass.uniforms.uPaletteMap.value) {
+          this.asciiPass.uniforms.uPaletteMap.value.dispose();
+        }
+        this.asciiPass.uniforms.uPaletteMap.value = paletteTexture;
+        this.asciiPass.uniforms.uPaletteColorCount.value = activeColors.length;
+      } else {
+        this.asciiPass.uniforms.uBackgroundColor.value.set(colors.background);
+      }
+
+      this.scene.background = finalBackgroundColor === null ? null : new THREE.Color(finalBackgroundColor);
+    } else if (effectType === 'bayer' || effectType === 'noise') {
+      this.ditherPass.enabled = true;
+
+      this.ditherPass.uniforms.uResolution.value.set(this.width, this.height);
+      if (this.ditherPass.uniforms.uPaletteMap.value) {
+        this.ditherPass.uniforms.uPaletteMap.value.dispose();
+      }
+      this.ditherPass.uniforms.uPaletteMap.value = paletteTexture;
+      this.ditherPass.uniforms.uPaletteColorCount.value = activeColors.length;
+      this.ditherPass.uniforms.uDitherScale.value = dither.scale;
+
+      if (effectType === 'bayer') {
+        this.ditherPass.uniforms.uDitherMode.value = 0;
+        this.ditherPass.uniforms.uMatrixType.value = dither.matrixType;
+      } else {
+        this.ditherPass.uniforms.uDitherMode.value = 1;
+      }
+
+      this.scene.background = finalBackgroundColor === null ? null : new THREE.Color(finalBackgroundColor);
+    }
+  }
+
+  _animate() {
+    if (!this.controls || !this.composer) return;
+    this.controls.update();
+    this.composer.render();
+    this.animationId = requestAnimationFrame(this._animate);
+  }
+
+  start() {
+    this._animate();
+  }
+
+  setAutoRotate(autoRotate) {
+    this.autoRotate = autoRotate;
+    if (this.controls) this.controls.autoRotate = autoRotate;
+  }
+
+  setSize(width, height, aspectRatio) {
+    this.width = width;
+    this.height = height;
+    this.aspectRatio = aspectRatio;
+    if (this.renderer && this.camera && this.composer) {
+      this.renderer.setSize(width, height);
+      this.composer.setSize(width, height);
+      this.camera.aspect = aspectRatio;
+      this.camera.updateProjectionMatrix();
+
+      if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(width, height);
+      if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(width, height);
+    }
+  }
+
+  resetCamera() {
+    if (!this.controls || !this.camera || !this.currentModel) return;
+
+    if (this.isVideo || this.isImage) {
+      const fovRadians = (50 * Math.PI) / 180;
+      const planeHeight = 2;
+      const optimalDistance = (planeHeight / 2) / Math.tan(fovRadians / 2);
+
+      this.controls.reset();
+      this.controls.target.set(0, 0, 0);
+      this.camera.position.set(0, 0, optimalDistance);
+      this.camera.lookAt(0, 0, 0);
+      this.camera.up.set(0, 1, 0);
+      this.controls.update();
+    } else {
+      const box = new THREE.Box3().setFromObject(this.currentModel);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 2.5 / maxDim;
+
+      this.controls.reset();
+      this.controls.target.copy(this.currentModel.position);
+      this.camera.position.set(
+        this.currentModel.position.x,
+        this.currentModel.position.y + size.y * scale * 0.5,
+        this.currentModel.position.z + size.z * scale * 2
+      );
+      this.camera.lookAt(this.currentModel.position);
+      this.controls.update();
+    }
+  }
+
+  // Dolly the camera toward/away from the current orbit target.
+  // factor < 1 zooms in, factor > 1 zooms out; distance is clamped to
+  // the same minDistance/maxDistance the scroll-wheel zoom respects.
+  zoomBy(factor) {
+    if (!this.camera || !this.controls) return;
+    const target = this.controls.target;
+    const offset = new THREE.Vector3().copy(this.camera.position).sub(target);
+    const currentDist = offset.length() || 0.001;
+    const minDist = this.controls.minDistance ?? 0.5;
+    const maxDist = this.controls.maxDistance ?? 40;
+    const nextDist = Math.min(Math.max(currentDist * factor, minDist), maxDist);
+    offset.setLength(nextDist);
+    this.camera.position.copy(target).add(offset);
+    this.controls.update();
+  }
+
+  exportImage(scale = 1) {
+    return new Promise((resolve, reject) => {
+      if (!this.renderer || !this.scene || !this.camera || !this.composer) {
+        reject('Renderer not ready');
+        return;
+      }
+
+      if (scale === 1) {
+        this.composer.render();
+        const dataURL = this.renderer.domElement.toDataURL('image/png');
+        resolve(dataURL);
+        return;
+      }
+
+      const currentWidth = this.renderer.domElement.width;
+      const currentHeight = this.renderer.domElement.height;
+
+      const targetWidth = Math.round(currentWidth * scale);
+      const targetHeight = Math.round(currentHeight * scale);
+
+      this.renderer.setSize(targetWidth, targetHeight);
+      this.composer.setSize(targetWidth, targetHeight);
+
+      const originalAspect = this.camera.aspect;
+      this.camera.aspect = targetWidth / targetHeight;
+      this.camera.updateProjectionMatrix();
+
+      if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+      if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+
+      this.composer.render();
+      const dataURL = this.renderer.domElement.toDataURL('image/png');
+
+      this.renderer.setSize(currentWidth, currentHeight);
+      this.composer.setSize(currentWidth, currentHeight);
+      this.camera.aspect = originalAspect;
+      this.camera.updateProjectionMatrix();
+
+      if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+      if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+
+      resolve(dataURL);
+    });
+  }
+
+  // Samples the post-levels (pre-ASCII-pass) frame and reproduces the ASCII
+  // shader's own tile→character→color mapping as real SVG <text> nodes —
+  // a genuine vector export, not a rasterized screenshot.
+  _buildAsciiSVGString(width, height) {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = width;
+    offscreen.height = height;
+    const ctx = offscreen.getContext('2d');
+    ctx.drawImage(this.renderer.domElement, 0, 0, width, height);
+    const imgData = ctx.getImageData(0, 0, width, height).data;
+
+    const { ascii, colors } = this.effectSettings;
+    const charSize = ascii.resolution || 6;
+    const charArray = Array.from(ascii.characters && ascii.characters.length ? ascii.characters : ' ');
+    const charCount = charArray.length;
+
+    const activeColors = colors.palette.filter((_, i) => colors.active[i]);
+    const usePalette = colors.usePalette && activeColors.length > 0;
+
+    const cols = Math.ceil(width / charSize);
+    const rows = Math.ceil(height / charSize);
+    const fontFamily = ascii.font === 'monospace' ? 'monospace' : `'${ascii.font}', monospace`;
+    const fontSize = charSize * (ascii.scale || 1);
+
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    let body = '';
+    for (let ty = 0; ty < rows; ty++) {
+      for (let tx = 0; tx < cols; tx++) {
+        const px = Math.min(tx * charSize, width - 1);
+        const py = Math.min(ty * charSize, height - 1);
+        const idx = (py * width + px) * 4;
+        const r = imgData[idx] / 255, g = imgData[idx + 1] / 255, b = imgData[idx + 2] / 255;
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+
+        let bgColor;
+        if (usePalette) {
+          const ci = Math.max(0, Math.min(activeColors.length - 1, Math.floor(luminance * (activeColors.length - 0.999))));
+          bgColor = activeColors[ci];
+        } else {
+          bgColor = colors.background;
+        }
+
+        let charColor;
+        if (ascii.useColorTrio && ascii.colorTrio) {
+          charColor = luminance < 0.33 ? ascii.colorTrio[0] : luminance < 0.66 ? ascii.colorTrio[1] : ascii.colorTrio[2];
+        } else {
+          charColor = ascii.color;
+        }
+
+        const charIndex = Math.max(0, Math.min(charCount - 1, Math.floor(luminance * (charCount - 0.999))));
+        const char = charArray[charIndex];
+
+        const x = tx * charSize;
+        const y = ty * charSize;
+        body += `<rect x="${x}" y="${y}" width="${charSize}" height="${charSize}" fill="${bgColor}"/>`;
+        if (char && char !== ' ') {
+          body += `<text x="${x + charSize / 2}" y="${y + charSize / 2}" font-family="${esc(fontFamily)}" font-size="${fontSize}" fill="${charColor}" text-anchor="middle" dominant-baseline="central">${esc(char)}</text>`;
+        }
+      }
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
+  }
+
+  // Vectorizes the already-dithered frame as a grid of solid-color rects.
+  // Bayer/noise dithering varies pixel-to-pixel, so a byte-exact vector
+  // copy would need one rect per screen pixel; instead we pick the
+  // finest tile size that keeps the element count sane (falling back to
+  // true 1:1 per-pixel rects for small/1x exports, where that budget
+  // is never even hit).
+  _buildBlockVectorSVGString(width, height) {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = width;
+    offscreen.height = height;
+    const ctx = offscreen.getContext('2d');
+    ctx.drawImage(this.renderer.domElement, 0, 0, width, height);
+    const imgData = ctx.getImageData(0, 0, width, height).data;
+
+    const maxTiles = 120000;
+    let tileSize = 1;
+    while ((width / tileSize) * (height / tileSize) > maxTiles) tileSize++;
+
+    const cols = Math.ceil(width / tileSize);
+    const rows = Math.ceil(height / tileSize);
+    const toHex = (v) => v.toString(16).padStart(2, '0');
+
+    let body = '';
+    for (let ty = 0; ty < rows; ty++) {
+      for (let tx = 0; tx < cols; tx++) {
+        const px = Math.min(tx * tileSize, width - 1);
+        const py = Math.min(ty * tileSize, height - 1);
+        const idx = (py * width + px) * 4;
+        const color = `#${toHex(imgData[idx])}${toHex(imgData[idx + 1])}${toHex(imgData[idx + 2])}`;
+        body += `<rect x="${tx * tileSize}" y="${ty * tileSize}" width="${tileSize}" height="${tileSize}" fill="${color}"/>`;
+      }
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`;
+  }
+
+  exportSVG(scale = 1) {
+    return new Promise((resolve, reject) => {
+      if (!this.renderer || !this.scene || !this.camera || !this.composer) {
+        reject('Renderer not ready');
+        return;
+      }
+
+      const currentWidth = this.renderer.domElement.width;
+      const currentHeight = this.renderer.domElement.height;
+      const targetWidth = Math.round(currentWidth * scale);
+      const targetHeight = Math.round(currentHeight * scale);
+      const originalAspect = this.camera.aspect;
+
+      if (scale !== 1) {
+        this.renderer.setSize(targetWidth, targetHeight);
+        this.composer.setSize(targetWidth, targetHeight);
+        this.camera.aspect = targetWidth / targetHeight;
+        this.camera.updateProjectionMatrix();
+        if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+        if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+      }
+
+      const restore = () => {
+        if (scale !== 1) {
+          this.renderer.setSize(currentWidth, currentHeight);
+          this.composer.setSize(currentWidth, currentHeight);
+          this.camera.aspect = originalAspect;
+          this.camera.updateProjectionMatrix();
+          if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+          if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+        }
+        this.composer.render();
+      };
+
+      try {
+        let svgString = null;
+        let isVector = false;
+        const effectType = this.effectSettings.effectType;
+
+        if (effectType === 'ascii') {
+          const charSize = this.effectSettings.ascii.resolution || 6;
+          const tileCount = Math.ceil(targetWidth / charSize) * Math.ceil(targetHeight / charSize);
+          // Above this a real per-character SVG gets impractically large/slow;
+          // fall through to the embedded-raster path instead.
+          if (tileCount <= 120000) {
+            const wasAscii = this.asciiPass.enabled;
+            const wasDither = this.ditherPass.enabled;
+            this.asciiPass.enabled = false;
+            this.ditherPass.enabled = false;
+            this.composer.render();
+            svgString = this._buildAsciiSVGString(targetWidth, targetHeight);
+            this.asciiPass.enabled = wasAscii;
+            this.ditherPass.enabled = wasDither;
+            isVector = true;
+          }
+        } else if (effectType === 'bayer' || effectType === 'noise' || effectType === 'none') {
+          this.composer.render();
+          svgString = this._buildBlockVectorSVGString(targetWidth, targetHeight);
+          isVector = true;
+        }
+
+        if (svgString === null) {
+          this.composer.render();
+          const dataURL = this.renderer.domElement.toDataURL('image/png');
+          svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${targetWidth}" height="${targetHeight}" viewBox="0 0 ${targetWidth} ${targetHeight}"><image href="${dataURL}" x="0" y="0" width="${targetWidth}" height="${targetHeight}"/></svg>`;
+        }
+
+        restore();
+
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        resolve({ url: URL.createObjectURL(blob), isVector });
+      } catch (err) {
+        restore();
+        reject(err);
+      }
+    });
+  }
+
+  exportVideo(scale = 1, onProgress) {
+    return new Promise((resolve, reject) => {
+      if (!this.renderer || !this.scene || !this.camera || !this.composer || !this.controls) {
+        reject('Renderer not ready');
+        return;
+      }
+
+      const currentWidth = this.renderer.domElement.width;
+      const currentHeight = this.renderer.domElement.height;
+      const originalAspect = this.camera.aspect;
+      const originalAutoRotate = this.controls.autoRotate;
+
+      const targetWidth = Math.round(currentWidth * scale);
+      const targetHeight = Math.round(currentHeight * scale);
+
+      if (scale !== 1) {
+        this.renderer.setSize(targetWidth, targetHeight);
+        this.composer.setSize(targetWidth, targetHeight);
+        this.camera.aspect = targetWidth / targetHeight;
+        this.camera.updateProjectionMatrix();
+
+        if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+        if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(targetWidth, targetHeight);
+      }
+
+      if (!this.isVideo && !this.isImage) {
+        this.controls.autoRotate = true;
+        this.controls.autoRotateSpeed = 2.0;
+      }
+
+      const canvas = this.renderer.domElement;
+      const stream = canvas.captureStream(30);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+
+      mediaRecorder.ondataavailable = (event) => chunks.push(event.data);
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+
+        if (scale !== 1) {
+          this.renderer.setSize(currentWidth, currentHeight);
+          this.composer.setSize(currentWidth, currentHeight);
+          this.camera.aspect = originalAspect;
+          this.camera.updateProjectionMatrix();
+
+          if (this.asciiPass) this.asciiPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+          if (this.ditherPass) this.ditherPass.uniforms.uResolution.value.set(currentWidth, currentHeight);
+        }
+
+        this.controls.autoRotate = originalAutoRotate;
+        this.controls.autoRotateSpeed = 1.0;
+
+        resolve(url);
+      };
+
+      mediaRecorder.onerror = (error) => reject(error);
+
+      mediaRecorder.start();
+
+      const duration = 5000;
+      const startTime = Date.now();
+
+      const progressInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / duration) * 100, 100);
+        onProgress?.(progress);
+
+        if (elapsed >= duration) {
+          clearInterval(progressInterval);
+          mediaRecorder.stop();
+        }
+      }, 100);
+
+      const recordingAnimate = () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed < duration) {
+          this.controls.update();
+          this.composer.render();
+          requestAnimationFrame(recordingAnimate);
+        }
+      };
+      recordingAnimate();
+    });
+  }
+
+  dispose() {
+    if (this.animationId) cancelAnimationFrame(this.animationId);
+    if (this.videoElement) {
+      this.videoElement.pause();
+      this.videoElement.src = '';
+    }
+    if (this.renderer && this.mountEl) {
+      try { this.mountEl.removeChild(this.renderer.domElement); } catch (e) {}
+      this.renderer.dispose();
+    }
+    this.initialized = false;
+  }
+}
+
+// ===== Effect Presets (ported from presets.ts) =====
+
+const EFFECT_PRESETS = [
+  // ASCII Presets
+  {
+    id: 'ascii-classic',
+    name: 'Classic ASCII',
+    description: 'Traditional text-based art',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.1,
+      contrast: 1.2,
+      ascii: {
+        font: 'monospace',
+        characters: ' .:-=+*#%@',
+        resolution: 6,
+        scale: 0.9,
+        color: '#000000'
+      },
+      colors: {
+        usePalette: false,
+        background: '#ffffff',
+        palette: ['#000000', '#ffffff'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-blocks',
+    name: 'Block Art',
+    description: 'Solid block characters for bold effects',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.0,
+      contrast: 1.4,
+      ascii: {
+        font: 'monospace',
+        characters: ' ░▒▓█',
+        resolution: 8,
+        scale: 1.0,
+        color: '#1a1a1a'
+      },
+      colors: {
+        usePalette: false,
+        background: '#f0f0f0',
+        palette: ['#1a1a1a', '#f0f0f0'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-geometric',
+    name: 'Geometric Shapes',
+    description: 'Modern geometric character set',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: -0.05,
+      contrast: 1.3,
+      ascii: {
+        font: 'monospace',
+        characters: ' ▗▖▞▚▘▄▀▐●□■',
+        resolution: 7,
+        scale: 0.95,
+        color: '#2563eb'
+      },
+      colors: {
+        usePalette: false,
+        background: '#dbeafe',
+        palette: ['#2563eb', '#dbeafe'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-symbols',
+    name: 'Retro Symbols',
+    description: 'Classic computer symbols with retro colors',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.10,
+      contrast: 1.60,
+      ascii: {
+        font: 'VT323',
+        characters: ' .·♠♣♥♦☺☻○●',
+        resolution: 9,
+        scale: 1.3,
+        color: '#00aa00',
+        colorTrio: ['#002200', '#00aa00', '#44ff44'],
+        useColorTrio: true
+      },
+      colors: {
+        usePalette: true,
+        background: '#002200',
+        palette: ['#002200', '#00aa00', '#ffdd00', '#ff6666', '#ffffff'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-vaporwave-neon',
+    name: 'Vaporwave Neon',
+    description: 'Electric neon symbols with vaporwave aesthetics',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.2,
+      contrast: 1.8,
+      ascii: {
+        font: 'VT323',
+        characters: ' ░▒▓◆◇○●◄►▲▼★☆※¤',
+        resolution: 6,
+        scale: 0.9,
+        color: '#ff00ff',
+        colorTrio: ['#440044', '#ff00ff', '#ff88ff'],
+        useColorTrio: true
+      },
+      colors: {
+        usePalette: true,
+        background: '#0a0015',
+        palette: ['#0a0015', '#ff00ff', '#00ffff', '#ff6ec7', '#bd00ff', '#00ff80'],
+        active: [true, true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-neon-cityscape',
+    name: 'Neon Cityscape',
+    description: 'Urban neon with building-like characters',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.12,
+      contrast: 1.65,
+      ascii: {
+        font: 'Roboto Mono',
+        characters: ' ░▒▓█▌▐▀▄■□▬▭▮▯◘◙',
+        resolution: 7,
+        scale: 1.0,
+        color: '#00ff80',
+        colorTrio: ['#003322', '#00ff80', '#66ffaa'],
+        useColorTrio: true
+      },
+      colors: {
+        usePalette: true,
+        background: '#001122',
+        palette: ['#001122', '#00ff80', '#ff0060', '#0080ff', '#ffff00', '#ff8000'],
+        active: [true, true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-dense',
+    name: 'High Detail',
+    description: 'Dense character set for maximum detail',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.0,
+      contrast: 1.25,
+      ascii: {
+        font: 'Source Code Pro',
+        characters: ' .+0█▙▟▛▜▝▘▗▖▞▚▄▀▐●□■_',
+        resolution: 5,
+        scale: 0.85,
+        color: '#059669'
+      },
+      colors: {
+        usePalette: false,
+        background: '#ecfdf5',
+        palette: ['#059669', '#ecfdf5'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-technical',
+    name: 'Technical Style',
+    description: 'Programming-inspired characters',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.1,
+      contrast: 1.35,
+      ascii: {
+        font: 'Roboto Mono',
+        characters: ' .-+*#|=<>{}[]()/',
+        resolution: 6,
+        scale: 0.9,
+        color: '#7c3aed'
+      },
+      colors: {
+        usePalette: false,
+        background: '#faf5ff',
+        palette: ['#7c3aed', '#faf5ff'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-minimal',
+    name: 'Minimalist',
+    description: 'Clean, simple character set',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.15,
+      contrast: 1.5,
+      ascii: {
+        font: 'Space Mono',
+        characters: ' ·•○●',
+        resolution: 8,
+        scale: 1.1,
+        color: '#374151'
+      },
+      colors: {
+        usePalette: false,
+        background: '#f9fafb',
+        palette: ['#374151', '#f9fafb'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'ascii-retro-gaming',
+    name: 'Retro Gaming',
+    description: '8-bit style characters',
+    category: 'ascii',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.1,
+      contrast: 1.4,
+      ascii: {
+        font: 'Press Start 2P',
+        characters: ' .:+*#@0123456789',
+        resolution: 5,
+        scale: 0.8,
+        color: '#00ff00'
+      },
+      colors: {
+        usePalette: false,
+        background: '#001100',
+        palette: ['#00ff00', '#001100'],
+        active: [true, true]
+      }
+    }
+  },
+
+  // Dither Presets
+  {
+    id: 'dither-gameboy',
+    name: 'Game Boy',
+    description: 'Classic handheld gaming palette',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.05,
+      contrast: 1.2,
+      dither: {
+        matrixType: 2,
+        scale: 4
+      },
+      colors: {
+        usePalette: true,
+        background: '#8bac0f',
+        palette: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'],
+        active: [true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-vaporwave',
+    name: 'Vaporwave',
+    description: 'Retro-futuristic aesthetic',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.1,
+      contrast: 1.3,
+      dither: {
+        matrixType: 1,
+        scale: 3
+      },
+      colors: {
+        usePalette: true,
+        background: '#ff00ff',
+        palette: ['#1a0033', '#ff00ff', '#00ffff', '#ff6ec7', '#ffd700'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-synthwave',
+    name: 'Synthwave Grid',
+    description: 'Retro-futuristic grid patterns with electric colors',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.15,
+      contrast: 1.7,
+      dither: {
+        matrixType: 1,
+        scale: 2
+      },
+      colors: {
+        usePalette: true,
+        background: '#000820',
+        palette: ['#000820', '#00ffff', '#ff0080', '#ffff00', '#ff4080', '#8000ff'],
+        active: [true, true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-cyberdelic',
+    name: 'Cyberdelic',
+    description: 'Psychedelic cyber dithering with rainbow neon',
+    category: 'dither',
+    settings: {
+      effectType: 'noise',
+      brightness: 0.25,
+      contrast: 1.9,
+      dither: {
+        matrixType: 3,
+        scale: 4
+      },
+      colors: {
+        usePalette: true,
+        background: '#0f001a',
+        palette: ['#0f001a', '#ff6ec7', '#00ff41', '#ff0080', '#00ffff', '#ffff00', '#ff4000'],
+        active: [true, true, true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-newspaper',
+    name: 'Newspaper',
+    description: 'Classic print media style',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.15,
+      contrast: 1.4,
+      dither: {
+        matrixType: 3,
+        scale: 2
+      },
+      colors: {
+        usePalette: true,
+        background: '#ffffff',
+        palette: ['#000000', '#404040', '#808080', '#c0c0c0', '#ffffff'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-cyberpunk',
+    name: 'Cyberpunk',
+    description: 'Neon dystopian color scheme',
+    category: 'dither',
+    settings: {
+      effectType: 'noise',
+      brightness: -0.1,
+      contrast: 1.5,
+      dither: {
+        matrixType: 2,
+        scale: 6
+      },
+      colors: {
+        usePalette: true,
+        background: '#000000',
+        palette: ['#000000', '#ff0080', '#00ff41', '#0080ff', '#ffff00'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-sepia',
+    name: 'Vintage Sepia',
+    description: 'Old photograph aesthetic',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.2,
+      contrast: 1.1,
+      dither: {
+        matrixType: 2,
+        scale: 5
+      },
+      colors: {
+        usePalette: true,
+        background: '#f4f1e8',
+        palette: ['#3d2914', '#8b4513', '#cd853f', '#deb887', '#f4f1e8'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+  {
+    id: 'dither-arctic',
+    name: 'Arctic Blues',
+    description: 'Cool blue monochrome palette',
+    category: 'dither',
+    settings: {
+      effectType: 'bayer',
+      brightness: 0.1,
+      contrast: 1.25,
+      dither: {
+        matrixType: 1,
+        scale: 4
+      },
+      colors: {
+        usePalette: true,
+        background: '#f0f9ff',
+        palette: ['#0c4a6e', '#0369a1', '#0ea5e9', '#7dd3fc', '#f0f9ff'],
+        active: [true, true, true, true, true]
+      }
+    }
+  },
+
+  // Mixed Presets
+  {
+    id: 'mixed-matrix',
+    name: 'Matrix Code',
+    description: 'Green terminal aesthetic',
+    category: 'mixed',
+    settings: {
+      effectType: 'ascii',
+      brightness: -0.05,
+      contrast: 1.8,
+      ascii: {
+        font: 'Source Code Pro',
+        characters: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        resolution: 4,
+        scale: 0.75,
+        color: '#00ff41',
+        colorTrio: ['#003311', '#00ff41', '#66ff66'],
+        useColorTrio: true
+      },
+      colors: {
+        usePalette: false,
+        background: '#000000',
+        palette: ['#00ff41', '#000000'],
+        active: [true, true]
+      }
+    }
+  },
+  {
+    id: 'mixed-blueprint',
+    name: 'Blueprint',
+    description: 'Technical drawing style',
+    category: 'mixed',
+    settings: {
+      effectType: 'ascii',
+      brightness: 0.2,
+      contrast: 1.4,
+      ascii: {
+        font: 'Roboto Mono',
+        characters: ' .-+|┌┐└┘├┤┬┴┼═║',
+        resolution: 7,
+        scale: 0.9,
+        color: '#ffffff'
+      },
+      colors: {
+        usePalette: false,
+        background: '#1e40af',
+        palette: ['#ffffff', '#1e40af'],
+        active: [true, true]
+      }
+    }
+  }
+];
+
+function getPresetsByCategory(category) {
+  if (!category) return EFFECT_PRESETS;
+  return EFFECT_PRESETS.filter(preset => preset.category === category);
+}
+
+function getPresetById(id) {
+  return EFFECT_PRESETS.find(preset => preset.id === id);
+}
+
+// ===== App bootstrap (ports App.tsx / ControlPanel.tsx / ExportModal.tsx / etc. to vanilla JS) =====
+
+const FONT_OPTIONS = [
+  { value: 'monospace', label: 'Default Monospace' },
+  { value: 'Roboto Mono', label: 'Roboto Mono' },
+  { value: 'Source Code Pro', label: 'Source Code Pro' },
+  { value: 'Space Mono', label: 'Space Mono' },
+  { value: 'Courier Prime', label: 'Courier Prime' },
+  { value: 'VT323', label: 'VT323' },
+  { value: 'Public Pixel', label: 'Public Pixel' },
+  { value: 'Press Start 2P', label: 'Press Start 2P' },
+  { value: 'Silkscreen', label: 'Silkscreen' },
+  { value: 'Playfair Display', label: 'Playfair Display' },
+  { value: 'Oswald', label: 'Oswald' },
+  { value: 'Lobster', label: 'Lobster' },
+  { value: 'Pacifico', label: 'Pacifico' },
+  { value: 'Uncial Antiqua', label: 'Uncial Antiqua' },
+];
+
+const DEFAULT_SETTINGS = {
+  effectType: 'ascii',
+  brightness: 0.0,
+  contrast: 1.0,
+  target: {
+    mode: 'fullScene',
+    background: {
+      type: 'solid',
+      solidColor: '#eeeeee',
+      gradientStart: '#eeeeee',
+      gradientEnd: '#ffffff',
+      gradientDirection: 'vertical'
+    }
+  },
+  ascii: {
+    font: 'monospace',
+    characters: ' .:-=+*#%@',
+    resolution: 6,
+    scale: 0.9,
+    color: '#000000',
+    colorTrio: ['#000000', '#333333', '#666666'],
+    useColorTrio: false
+  },
+  dither: {
+    matrixType: 2,
+    scale: 3
+  },
+  colors: {
+    usePalette: true,
+    reversePalette: false,
+    background: '#eeeeee',
+    palette: ['#1b1c19', '#5f2398', '#025ffb', '#f0e800', '#f1cccc'],
+    active: [true, true, true, true, true]
+  },
+  aspectRatio: { width: 1, height: 1 },
+  lighting: { directionalAngle: -45, intensity: 80 },
+  isDark: false
+};
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function deepMerge(target, source) {
+  for (const key in source) {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      if (!target[key]) target[key] = {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+
+// ---- Global state ----
+let effectSettings = deepClone(DEFAULT_SETTINGS);
+let autoRotate = true;
+let customCursorEnabled = true;
+let isPreviewActive = false;
+let originalSettings = null;
+let isExporting = false;
+
+// ---- Font loading ----
+const loadedFonts = new Set(['monospace']);
+function loadFont(fontName) {
+  if (loadedFonts.has(fontName)) return Promise.resolve();
+  const fontUrlName = fontName.replace(/ /g, '+');
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${fontUrlName}:ital,wght@0,400;0,700;1,400;1,700&display=swap`;
+  document.head.appendChild(link);
+  return document.fonts.load(`1em "${fontName}"`).then(() => {
+    loadedFonts.add(fontName);
+  }).catch((err) => console.error(`Font failed to load: ${fontName}`, err));
+}
+loadFont('Newsreader');
+
+// ---- DOM refs ----
+const $ = (id) => document.getElementById(id);
+
+const sidebarEl = document.querySelector('.sidebar');
+const topBarEl = document.querySelector('.top-bar');
+const canvasMountEl = $('canvas-mount');
+const canvasCardEl = $('canvas-card');
+
+// Sliders in this app use the source's chunky pill track with a filled
+// portion up to the thumb; native <input type=range> can't do that alone,
+// so we paint a two-color gradient on the element itself.
+function updateSliderFill(el) {
+  const min = parseFloat(el.min) || 0;
+  const max = parseFloat(el.max) || 100;
+  const val = parseFloat(el.value);
+  const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+  el.style.background = `linear-gradient(to right, var(--primary) 0%, var(--primary) ${pct}%, var(--muted) ${pct}%, var(--muted) 100%)`;
+}
+document.addEventListener('input', (e) => {
+  if (e.target.matches('input[type="range"]')) updateSliderFill(e.target);
+});
+function syncAllSliderFills() {
+  document.querySelectorAll('input[type="range"]').forEach(updateSliderFill);
+}
+
+// ==================================================================
+// Renderer
+// ==================================================================
+function calculateCanvasDimensions() {
+  const containerWidth = window.innerWidth;
+  const containerHeight = window.innerHeight;
+  const targetRatio = effectSettings.aspectRatio.width / effectSettings.aspectRatio.height;
+
+  const isStacked = window.matchMedia('(max-width: 860px)').matches;
+  const sidebarWidth = isStacked ? 0 : (sidebarEl.offsetWidth || 340);
+  const sidebarHeight = isStacked ? (sidebarEl.offsetHeight || 0) : 0;
+  const topBarHeight = topBarEl.offsetHeight || 52;
+  const mainPadding = 32;
+
+  let width = containerWidth - sidebarWidth;
+  let height = containerHeight - topBarHeight - mainPadding - sidebarHeight;
+
+  if (width / height > targetRatio) {
+    width = height * targetRatio;
+  } else {
+    height = width / targetRatio;
+  }
+
+  return { width: Math.max(300, Math.floor(width)), height: Math.max(200, Math.floor(height)), aspectRatio: targetRatio };
+}
+
+function getEffectiveSettings() {
+  const { palette, active, reversePalette } = effectSettings.colors;
+  const effPalette = reversePalette ? [...palette].reverse() : palette;
+  const effActive = reversePalette ? [...active].reverse() : active;
+  return {
+    ...effectSettings,
+    colors: { ...effectSettings.colors, palette: effPalette, active: effActive }
+  };
+}
+
+let canvasDimensions = calculateCanvasDimensions();
+
+const renderer = new ThreeJSRenderer(canvasMountEl, {
+  width: canvasDimensions.width,
+  height: canvasDimensions.height,
+  aspectRatio: canvasDimensions.aspectRatio,
+  effectSettings: getEffectiveSettings(),
+  autoRotate,
+  onVideoLoad: (ar) => handleMediaLoad(ar),
+  onImageLoad: (ar) => handleMediaLoad(ar),
+});
+renderer.init();
+renderer.start();
+
+function applyRendererSettings() {
+  renderer.updateEffectSettings(getEffectiveSettings());
+}
+
+function updateSettings(updates) {
+  deepMerge(effectSettings, updates);
+  applyRendererSettings();
+}
+
+function resizeCanvas() {
+  canvasDimensions = calculateCanvasDimensions();
+  renderer.setSize(canvasDimensions.width, canvasDimensions.height, canvasDimensions.aspectRatio);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function handleMediaLoad(aspectRatio) {
+  autoRotate = false;
+  effectSettings.aspectRatio = { width: aspectRatio.width, height: aspectRatio.height };
+  syncRotationButton();
+  $('aspect-width').value = aspectRatio.width;
+  $('aspect-height').value = aspectRatio.height;
+  resizeCanvas();
+}
+
+// ==================================================================
+// Top bar
+// ==================================================================
+function syncRotationButton() {
+  $('icon-pause').style.display = autoRotate ? '' : 'none';
+  $('icon-play').style.display = autoRotate ? 'none' : '';
+  $('rotation-label').textContent = autoRotate ? 'Stop rotation' : 'Start rotation';
+}
+
+$('btn-custom-cursor').addEventListener('click', () => {
+  customCursorEnabled = !customCursorEnabled;
+  $('btn-custom-cursor').classList.toggle('is-active', customCursorEnabled);
+  if (!customCursorEnabled) hideCustomCursor();
+});
+
+$('btn-reset-camera').addEventListener('click', () => renderer.resetCamera());
+$('btn-zoom-in').addEventListener('click', () => renderer.zoomBy(0.8));
+$('btn-zoom-out').addEventListener('click', () => renderer.zoomBy(1.25));
+
+$('btn-toggle-rotation').addEventListener('click', () => {
+  autoRotate = !autoRotate;
+  renderer.setAutoRotate(autoRotate);
+  syncRotationButton();
+});
+
+$('btn-export').addEventListener('click', () => openExportModal());
+
+// ==================================================================
+// File upload
+// ==================================================================
+const VALID_EXTENSIONS = ['.obj', '.glb', '.gltf', '.mp4', '.webm', '.mov', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+
+function setStatus(msg) {
+  const el = $('file-status');
+  if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = '';
+  el.textContent = msg;
+}
+
+async function handleFileSelect(file) {
+  const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+  if (!VALID_EXTENSIONS.includes(ext)) {
+    console.error('Unsupported file format');
+    return;
+  }
+  setStatus('Loading...');
+  try {
+    await renderer.loadFile(file);
+    setStatus('Load complete.');
+  } catch (err) {
+    console.error('Error loading file:', err);
+    setStatus('Error loading file.');
+  }
+}
+
+const dropzone = $('file-dropzone');
+const fileInput = $('file-input');
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+fileInput.addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); });
+['dragenter', 'dragover'].forEach((evt) => dropzone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('drag-over'); }));
+['dragleave', 'drop'].forEach((evt) => dropzone.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('drag-over'); }));
+dropzone.addEventListener('drop', (e) => { const f = e.dataTransfer.files?.[0]; if (f) handleFileSelect(f); });
+
+$('aspect-width').addEventListener('change', (e) => {
+  const v = parseFloat(e.target.value) || 1;
+  effectSettings.aspectRatio.width = v;
+  resizeCanvas();
+});
+$('aspect-height').addEventListener('change', (e) => {
+  const v = parseFloat(e.target.value) || 1;
+  effectSettings.aspectRatio.height = v;
+  resizeCanvas();
+});
+
+// ==================================================================
+// Light
+// ==================================================================
+$('light-angle').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  $('light-angle-label').textContent = `Angle: ${v}°`;
+  updateSettings({ lighting: { directionalAngle: v } });
+});
+$('light-intensity').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  $('light-intensity-label').textContent = `Intensity: ${v}%`;
+  updateSettings({ lighting: { intensity: v } });
+});
+
+// ==================================================================
+// Effect type
+// ==================================================================
+$('effect-type-select').addEventListener('change', (e) => {
+  updateSettings({ effectType: e.target.value });
+  syncEffectVisibility();
+});
+
+function syncEffectVisibility() {
+  const t = effectSettings.effectType;
+  $('effect-params-group').style.display = t === 'none' ? 'none' : '';
+  $('ascii-group').style.display = t === 'ascii' ? '' : 'none';
+  $('dither-group').style.display = (t === 'bayer' || t === 'noise') ? '' : 'none';
+  $('dither-matrix-group').style.display = t === 'bayer' ? '' : 'none';
+}
+
+// ==================================================================
+// Levels
+// ==================================================================
+$('brightness-range').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  $('brightness-label').textContent = `Brightness: ${v.toFixed(2)}`;
+  updateSettings({ brightness: v });
+});
+$('contrast-range').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  $('contrast-label').textContent = `Contrast: ${v.toFixed(2)}`;
+  updateSettings({ contrast: v });
+});
+
+// ==================================================================
+// ASCII
+// ==================================================================
+const fontSelect = $('ascii-font-select');
+FONT_OPTIONS.forEach((f) => {
+  const opt = document.createElement('option');
+  opt.value = f.value;
+  opt.textContent = f.label;
+  fontSelect.appendChild(opt);
+});
+fontSelect.addEventListener('change', (e) => {
+  const font = e.target.value;
+  loadFont(font).finally(() => updateSettings({ ascii: { font } }));
+});
+
+$('ascii-characters-input').addEventListener('input', (e) => {
+  updateSettings({ ascii: { characters: e.target.value } });
+});
+
+$('ascii-resolution-range').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  $('ascii-resolution-label').textContent = `ASCII Resolution: ${v}`;
+  updateSettings({ ascii: { resolution: v } });
+});
+
+$('ascii-scale-range').addEventListener('input', (e) => {
+  const v = parseFloat(e.target.value);
+  $('ascii-scale-label').textContent = `Character Scale: ${v.toFixed(2)}`;
+  updateSettings({ ascii: { scale: v } });
+});
+
+// ASCIIColorTrio
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+$('colortrio-toggle').addEventListener('change', (e) => {
+  const on = e.target.checked;
+  updateSettings({ ascii: { useColorTrio: on } });
+  $('ascii-color-single-wrap').style.display = on ? 'none' : '';
+  $('ascii-color-trio-wrap').style.display = on ? '' : 'none';
+});
+
+function wireColorPair(colorInputId, hexInputId, onChange) {
+  const colorEl = $(colorInputId);
+  const hexEl = $(hexInputId);
+  colorEl.addEventListener('input', (e) => { hexEl.value = e.target.value; onChange(e.target.value); });
+  hexEl.addEventListener('input', (e) => {
+    if (HEX_RE.test(e.target.value)) { colorEl.value = e.target.value; onChange(e.target.value); }
+  });
+}
+
+wireColorPair('ascii-color-single', 'ascii-color-single-hex', (color) => updateSettings({ ascii: { color } }));
+
+[0, 1, 2].forEach((i) => {
+  wireColorPair(`trio-color-${i}`, `trio-hex-${i}`, (color) => {
+    const trio = [...effectSettings.ascii.colorTrio];
+    trio[i] = color;
+    updateSettings({ ascii: { colorTrio: trio } });
+  });
+});
+
+// ==================================================================
+// Dither
+// ==================================================================
+$('dither-matrix-select').addEventListener('change', (e) => {
+  updateSettings({ dither: { matrixType: parseInt(e.target.value, 10) } });
+});
+$('dither-scale-range').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  $('dither-scale-label').textContent = `Dither Scale: ${v}`;
+  updateSettings({ dither: { scale: v } });
+});
+
+// ==================================================================
+// Color palette
+// ==================================================================
+$('palette-toggle').addEventListener('change', (e) => {
+  updateSettings({ colors: { usePalette: e.target.checked } });
+  syncPaletteVisibility();
+});
+
+wireColorPair('bg-color', 'bg-color-hex', (color) => updateSettings({ colors: { background: color } }));
+
+$('reverse-palette-toggle').addEventListener('change', (e) => {
+  updateSettings({ colors: { reversePalette: e.target.checked } });
+});
+
+function syncPaletteVisibility() {
+  const { usePalette } = effectSettings.colors;
+  const t = effectSettings.effectType;
+  $('bg-color-wrap').style.display = (!usePalette && t === 'ascii') ? '' : 'none';
+  $('palette-wrap').style.display = usePalette ? '' : 'none';
+}
+
+function renderPaletteSwatches() {
+  const wrap = $('palette-swatches');
+  wrap.innerHTML = '';
+  effectSettings.colors.palette.forEach((color, index) => {
+    const card = document.createElement('div');
+    card.className = 'palette-swatch-card';
+    card.innerHTML = `
+      <div class="palette-swatch-head">
+        <span class="mono-label">Color ${index + 1}</span>
+        <input type="checkbox" class="checkbox swatch-active" />
+      </div>
+      <div class="color-row">
+        <input type="color" class="swatch-color" />
+        <input type="text" class="swatch-hex" />
+      </div>
+    `;
+    const activeBox = card.querySelector('.swatch-active');
+    const colorBox = card.querySelector('.swatch-color');
+    const hexBox = card.querySelector('.swatch-hex');
+    activeBox.checked = !!effectSettings.colors.active[index];
+    colorBox.value = color;
+    hexBox.value = color;
+
+    activeBox.addEventListener('change', (e) => {
+      const next = [...effectSettings.colors.active];
+      next[index] = e.target.checked;
+      updateSettings({ colors: { active: next } });
+    });
+    colorBox.addEventListener('input', (e) => {
+      hexBox.value = e.target.value;
+      const next = [...effectSettings.colors.palette];
+      next[index] = e.target.value;
+      updateSettings({ colors: { palette: next } });
+    });
+    hexBox.addEventListener('input', (e) => {
+      if (HEX_RE.test(e.target.value)) {
+        colorBox.value = e.target.value;
+        const next = [...effectSettings.colors.palette];
+        next[index] = e.target.value;
+        updateSettings({ colors: { palette: next } });
+      }
+    });
+
+    wrap.appendChild(card);
+  });
+}
+
+// ==================================================================
+// Effect presets (custom dropdown with hover-preview)
+// ==================================================================
+const CATEGORY_LABELS = { ascii: 'ASCII EFFECTS', dither: 'DITHER EFFECTS', mixed: 'SPECIAL EFFECTS' };
+
+function buildPresetPanel() {
+  const panel = $('preset-panel');
+  panel.innerHTML = '';
+
+  const noneOpt = document.createElement('div');
+  noneOpt.className = 'preset-option';
+  noneOpt.textContent = 'None (Custom)';
+  noneOpt.addEventListener('click', () => selectPreset('none'));
+  panel.appendChild(noneOpt);
+
+  ['ascii', 'dither', 'mixed'].forEach((cat) => {
+    const presets = EFFECT_PRESETS.filter((p) => p.category === cat);
+    if (!presets.length) return;
+    const header = document.createElement('div');
+    header.className = 'preset-header';
+    header.textContent = CATEGORY_LABELS[cat];
+    panel.appendChild(header);
+
+    presets.forEach((preset) => {
+      const opt = document.createElement('div');
+      opt.className = 'preset-option';
+      opt.textContent = preset.name;
+      opt.addEventListener('mouseenter', () => previewPreset(preset.id));
+      opt.addEventListener('click', () => selectPreset(preset.id));
+      panel.appendChild(opt);
+    });
+  });
+
+  panel.addEventListener('mouseleave', endPresetPreview);
+}
+buildPresetPanel();
+
+const presetTrigger = $('preset-trigger');
+const presetPanel = $('preset-panel');
+presetTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  presetPanel.classList.toggle('open');
+});
+document.addEventListener('click', (e) => {
+  if (!presetPanel.contains(e.target) && e.target !== presetTrigger && !presetTrigger.contains(e.target)) {
+    presetPanel.classList.remove('open');
+  }
+});
+
+function defaultPresetSettings() {
+  return {
+    effectType: 'ascii',
+    brightness: 0.0,
+    contrast: 1.0,
+    target: deepClone(DEFAULT_SETTINGS.target),
+    ascii: deepClone(DEFAULT_SETTINGS.ascii),
+    dither: deepClone(DEFAULT_SETTINGS.dither),
+    colors: deepClone(DEFAULT_SETTINGS.colors),
+    aspectRatio: { width: 1, height: 1 },
+    lighting: { directionalAngle: -45, intensity: 80 }
+  };
+}
+
+function previewPreset(presetId) {
+  if (!isPreviewActive) {
+    originalSettings = deepClone(effectSettings);
+    isPreviewActive = true;
+  }
+  const preset = getPresetById(presetId);
+  if (preset) {
+    if (preset.settings.effectType === 'ascii' && preset.settings.ascii?.font) loadFont(preset.settings.ascii.font);
+    effectSettings = { ...effectSettings, ...deepClone(preset.settings) };
+    applyRendererSettings();
+    syncControlPanel();
+  }
+}
+
+function endPresetPreview() {
+  if (isPreviewActive && originalSettings) {
+    effectSettings = originalSettings;
+    originalSettings = null;
+    isPreviewActive = false;
+    applyRendererSettings();
+    syncControlPanel();
+  }
+}
+
+function selectPreset(presetId) {
+  if (presetId === 'none') {
+    effectSettings = { ...effectSettings, ...defaultPresetSettings() };
+    $('preset-trigger-label').textContent = 'None (Custom)';
+    $('preset-trigger-label').style.color = '';
+  } else {
+    const preset = getPresetById(presetId);
+    if (preset) {
+      if (preset.settings.effectType === 'ascii' && preset.settings.ascii?.font) loadFont(preset.settings.ascii.font);
+      effectSettings = { ...effectSettings, ...deepClone(preset.settings) };
+      $('preset-trigger-label').textContent = preset.name;
+      $('preset-trigger-label').style.color = '';
+    }
+  }
+  isPreviewActive = false;
+  originalSettings = null;
+  presetPanel.classList.remove('open');
+  applyRendererSettings();
+  syncControlPanel();
+  resizeCanvas();
+}
+
+// ==================================================================
+// Full control-panel sync (after presets / file load / init)
+// ==================================================================
+function syncControlPanel() {
+  const s = effectSettings;
+
+  $('effect-type-select').value = s.effectType;
+  syncEffectVisibility();
+
+  $('brightness-range').value = s.brightness;
+  $('brightness-label').textContent = `Brightness: ${s.brightness.toFixed(2)}`;
+  $('contrast-range').value = s.contrast;
+  $('contrast-label').textContent = `Contrast: ${s.contrast.toFixed(2)}`;
+
+  $('ascii-font-select').value = s.ascii.font;
+  $('ascii-characters-input').value = s.ascii.characters;
+  $('ascii-resolution-range').value = s.ascii.resolution;
+  $('ascii-resolution-label').textContent = `ASCII Resolution: ${s.ascii.resolution}`;
+  $('ascii-scale-range').value = s.ascii.scale;
+  $('ascii-scale-label').textContent = `Character Scale: ${s.ascii.scale.toFixed(2)}`;
+
+  $('colortrio-toggle').checked = s.ascii.useColorTrio;
+  $('ascii-color-single-wrap').style.display = s.ascii.useColorTrio ? 'none' : '';
+  $('ascii-color-trio-wrap').style.display = s.ascii.useColorTrio ? '' : 'none';
+  $('ascii-color-single').value = s.ascii.color;
+  $('ascii-color-single-hex').value = s.ascii.color;
+  [0, 1, 2].forEach((i) => {
+    $(`trio-color-${i}`).value = s.ascii.colorTrio[i];
+    $(`trio-hex-${i}`).value = s.ascii.colorTrio[i];
+  });
+
+  $('dither-matrix-select').value = String(s.dither.matrixType);
+  $('dither-scale-range').value = s.dither.scale;
+  $('dither-scale-label').textContent = `Dither Scale: ${s.dither.scale}`;
+
+  $('palette-toggle').checked = s.colors.usePalette;
+  $('bg-color').value = s.colors.background;
+  $('bg-color-hex').value = s.colors.background;
+  $('reverse-palette-toggle').checked = s.colors.reversePalette;
+  syncPaletteVisibility();
+  renderPaletteSwatches();
+
+  $('light-angle').value = s.lighting.directionalAngle;
+  $('light-angle-label').textContent = `Angle: ${s.lighting.directionalAngle}°`;
+  $('light-intensity').value = s.lighting.intensity;
+  $('light-intensity-label').textContent = `Intensity: ${s.lighting.intensity}%`;
+
+  $('aspect-width').value = s.aspectRatio.width;
+  $('aspect-height').value = s.aspectRatio.height;
+
+  syncAllSliderFills();
+}
+
+// ==================================================================
+// Export modal
+// ==================================================================
+const exportModal = $('export-modal');
+
+function updateExportSizeLabel() {
+  const scale = parseFloat($('export-scale').value);
+  const w = Math.round(canvasDimensions.width * scale);
+  const h = Math.round(canvasDimensions.height * scale);
+  $('export-size-label').textContent = `${w} × ${h} pixels`;
+  const format = $('export-format').value;
+  $('export-video-note').style.display = format === 'mp4' ? '' : 'none';
+  $('export-svg-note').style.display = format === 'svg' ? '' : 'none';
+  $('export-start-label').textContent = `Export ${format.toUpperCase()}`;
+}
+
+function openExportModal() {
+  updateExportSizeLabel();
+  exportModal.classList.add('open');
+}
+function closeExportModal() {
+  exportModal.classList.remove('open');
+  isExporting = false;
+  $('export-progress-wrap').style.display = 'none';
+  $('export-progress-fill').style.width = '0%';
+  $('export-cancel').disabled = false;
+  $('export-start').disabled = false;
+}
+
+$('export-format').addEventListener('change', updateExportSizeLabel);
+$('export-scale').addEventListener('change', updateExportSizeLabel);
+$('export-cancel').addEventListener('click', () => { if (!isExporting) closeExportModal(); });
+exportModal.addEventListener('click', (e) => { if (e.target === exportModal && !isExporting) closeExportModal(); });
+
+$('export-start').addEventListener('click', async () => {
+  const format = $('export-format').value;
+  const scale = parseFloat($('export-scale').value);
+
+  isExporting = true;
+  $('export-cancel').disabled = true;
+  $('export-start').disabled = true;
+  $('export-progress-wrap').style.display = '';
+  $('export-progress-label').textContent = 'Exporting... 0%';
+  $('export-progress-fill').style.width = '0%';
+
+  try {
+    let dataUrl;
+    let filenameTag = '';
+    if (format === 'png') {
+      dataUrl = await renderer.exportImage(scale);
+      $('export-progress-label').textContent = 'Exporting... 100%';
+      $('export-progress-fill').style.width = '100%';
+    } else if (format === 'svg') {
+      const result = await renderer.exportSVG(scale);
+      dataUrl = result.url;
+      filenameTag = result.isVector ? '-vector' : '-raster';
+      $('export-progress-label').textContent = 'Exporting... 100%';
+      $('export-progress-fill').style.width = '100%';
+    } else {
+      dataUrl = await renderer.exportVideo(scale, (progress) => {
+        $('export-progress-label').textContent = `Exporting... ${Math.round(progress)}%`;
+        $('export-progress-fill').style.width = `${progress}%`;
+      });
+    }
+
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `canvas-export${filenameTag}-${Date.now()}.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    if (format === 'mp4' || format === 'svg') URL.revokeObjectURL(dataUrl);
+
+    setTimeout(closeExportModal, 1000);
+  } catch (err) {
+    console.error('Export failed:', err);
+    isExporting = false;
+    $('export-cancel').disabled = false;
+    $('export-start').disabled = false;
+    $('export-progress-wrap').style.display = 'none';
+  }
+});
+
+// ==================================================================
+// Custom cursor
+// ==================================================================
+const cursorEl = $('custom-cursor');
+const cursorDefaultSvg = $('cursor-default');
+const cursorGrabSvg = $('cursor-grab');
+let cursorVisible = false;
+
+function showCustomCursor() {
+  if (!customCursorEnabled) return;
+  cursorVisible = true;
+  cursorEl.style.display = 'block';
+  document.body.style.cursor = 'none';
+}
+function hideCustomCursor() {
+  cursorVisible = false;
+  cursorEl.style.display = 'none';
+  document.body.style.cursor = 'auto';
+}
+function setCursorState(state) {
+  const isGrab = state === 'grab' || state === 'grabbing';
+  cursorDefaultSvg.style.display = isGrab ? 'none' : '';
+  cursorGrabSvg.style.display = isGrab ? '' : 'none';
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (!cursorVisible) return;
+  cursorEl.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+});
+
+canvasCardEl.addEventListener('mouseenter', showCustomCursor);
+canvasCardEl.addEventListener('mouseleave', hideCustomCursor);
+canvasCardEl.addEventListener('mousedown', (e) => { if (customCursorEnabled && e.button === 0) setCursorState('grab'); });
+canvasCardEl.addEventListener('mouseup', () => { if (customCursorEnabled) setCursorState('default'); });
+canvasCardEl.addEventListener('mousemove', (e) => {
+  if (!customCursorEnabled) return;
+  setCursorState(e.buttons === 1 ? 'grabbing' : 'default');
+});
+
+// ==================================================================
+// Init
+// ==================================================================
+syncControlPanel();
+resizeCanvas();
+
+</script>
+</body>
+</html>
